@@ -5,6 +5,7 @@ import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:uuid/uuid.dart';
 
 import '../models/chat_message.dart';
+import '../services/ai_provider_controller.dart';
 import '../services/ai_service.dart';
 import '../services/auth_service.dart';
 import '../services/chat_prefs.dart';
@@ -23,14 +24,14 @@ enum _StartupChoice { continueChat, newChat }
 class ChatPage extends StatefulWidget {
   const ChatPage({
     super.key,
-    required this.aiService,
+    required this.aiProviderController,
     required this.chatRepository,
     required this.chatPrefs,
     required this.authService,
     required this.userId,
   });
 
-  final AiService aiService;
+  final AiProviderController aiProviderController;
   final MessageRepository chatRepository;
   final ChatPrefs chatPrefs;
   final AuthService authService;
@@ -52,14 +53,20 @@ class _ChatPageState extends State<ChatPage> {
   @override
   void initState() {
     super.initState();
+    widget.aiProviderController.addListener(_onProviderChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) => _bootstrap());
   }
 
   @override
   void dispose() {
+    widget.aiProviderController.removeListener(_onProviderChanged);
     _controller.dispose();
     _scrollController.dispose();
     super.dispose();
+  }
+
+  void _onProviderChanged() {
+    if (mounted) setState(() {});
   }
 
   Future<void> _bootstrap() async {
@@ -223,7 +230,8 @@ class _ChatPageState extends State<ChatPage> {
     unawaited(saveUserMessage);
 
     try {
-      final reply = await widget.aiService.generateReply(text);
+      final reply = await widget.aiProviderController.activeService
+          .generateReply(text);
 
       if (!mounted) return;
       setState(() {
@@ -302,6 +310,7 @@ class _ChatPageState extends State<ChatPage> {
         title: const Text('AIDA'),
         centerTitle: true,
         actions: [
+          _ProviderMenuButton(controller: widget.aiProviderController),
           IconButton(
             key: const Key('historyButton'),
             onPressed: _isInitializing ? null : _openHistory,
@@ -427,6 +436,45 @@ class MessageBubble extends StatelessWidget {
                     ),
                   ),
                 ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ProviderMenuButton extends StatelessWidget {
+  const _ProviderMenuButton({required this.controller});
+
+  final AiProviderController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final availableProviders = controller.availableProviders;
+
+    return PopupMenuButton<AiProvider>(
+      key: const Key('providerMenuButton'),
+      tooltip: 'AI provider',
+      initialValue: controller.current,
+      onSelected: controller.select,
+      itemBuilder: (context) => [
+        for (final provider in availableProviders)
+          CheckedPopupMenuItem<AiProvider>(
+            value: provider,
+            checked: provider == controller.current,
+            child: Text(provider.label),
+          ),
+      ],
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.smart_toy_outlined, size: 20),
+            const SizedBox(width: 6),
+            Text(controller.current.label),
+            if (availableProviders.length > 1)
+              const Icon(Icons.arrow_drop_down, size: 20),
+          ],
         ),
       ),
     );

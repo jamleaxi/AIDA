@@ -3,6 +3,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'screens/auth_gate.dart';
+import 'services/ai_provider_controller.dart';
 import 'services/ai_service.dart';
 import 'services/auth_service.dart';
 import 'services/chat_prefs.dart';
@@ -65,12 +66,19 @@ Future<void> main() async {
     return;
   }
 
+  final aiProviderController = AiProviderController(
+    services: {
+      if (geminiApiKey.isNotEmpty)
+        AiProvider.gemini: GeminiService(apiKey: geminiApiKey),
+      if (groqApiKey.isNotEmpty)
+        AiProvider.groq: GroqService(apiKey: groqApiKey),
+    },
+    initialProvider: provider,
+  );
+
   runApp(
     AidaApp(
-      aiService: switch (provider) {
-        AiProvider.gemini => GeminiService(apiKey: geminiApiKey),
-        AiProvider.groq => GroqService(apiKey: groqApiKey),
-      },
+      aiProviderController: aiProviderController,
       chatRepository: ChatRepository(Supabase.instance.client),
       chatPrefs: ChatPrefs(),
       authService: SupabaseAuthService(Supabase.instance.client),
@@ -81,13 +89,13 @@ Future<void> main() async {
 class AidaApp extends StatefulWidget {
   const AidaApp({
     super.key,
-    required this.aiService,
+    required this.aiProviderController,
     required this.chatRepository,
     required this.chatPrefs,
     required this.authService,
   });
 
-  final AiService aiService;
+  final AiProviderController aiProviderController;
   final MessageRepository chatRepository;
   final ChatPrefs chatPrefs;
   final AuthService authService;
@@ -99,7 +107,7 @@ class AidaApp extends StatefulWidget {
 class _AidaAppState extends State<AidaApp> {
   @override
   void dispose() {
-    widget.aiService.close();
+    widget.aiProviderController.closeAll();
     super.dispose();
   }
 
@@ -114,7 +122,7 @@ class _AidaAppState extends State<AidaApp> {
       ),
       home: AuthGate(
         authService: widget.authService,
-        aiService: widget.aiService,
+        aiProviderController: widget.aiProviderController,
         chatRepository: widget.chatRepository,
         chatPrefs: widget.chatPrefs,
       ),

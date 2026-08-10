@@ -1,6 +1,7 @@
 import 'package:aida/main.dart';
 import 'package:aida/models/chat_message.dart';
 import 'package:aida/models/conversation_summary.dart';
+import 'package:aida/services/ai_provider_controller.dart';
 import 'package:aida/services/ai_service.dart';
 import 'package:aida/services/auth_service.dart';
 import 'package:aida/services/chat_prefs.dart';
@@ -17,7 +18,10 @@ void main() {
   testWidgets('sends a message and displays a reply', (tester) async {
     await tester.pumpWidget(
       AidaApp(
-        aiService: _FakeAiService(),
+        aiProviderController: AiProviderController(
+          services: {AiProvider.gemini: _FakeAiService()},
+          initialProvider: AiProvider.gemini,
+        ),
         chatRepository: _FakeRepository(),
         chatPrefs: ChatPrefs(),
         authService: _FakeAuthService(),
