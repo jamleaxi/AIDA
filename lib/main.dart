@@ -2,12 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import 'screens/chat_page.dart';
+import 'screens/auth_gate.dart';
 import 'services/ai_service.dart';
+import 'services/auth_service.dart';
 import 'services/chat_prefs.dart';
 import 'services/chat_repository.dart';
 import 'services/gemini_service.dart';
 import 'services/groq_service.dart';
+import 'services/supabase_auth_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -71,6 +73,7 @@ Future<void> main() async {
       },
       chatRepository: ChatRepository(Supabase.instance.client),
       chatPrefs: ChatPrefs(),
+      authService: SupabaseAuthService(Supabase.instance.client),
     ),
   );
 }
@@ -81,11 +84,13 @@ class AidaApp extends StatefulWidget {
     required this.aiService,
     required this.chatRepository,
     required this.chatPrefs,
+    required this.authService,
   });
 
   final AiService aiService;
   final MessageRepository chatRepository;
   final ChatPrefs chatPrefs;
+  final AuthService authService;
 
   @override
   State<AidaApp> createState() => _AidaAppState();
@@ -107,7 +112,8 @@ class _AidaAppState extends State<AidaApp> {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.indigo),
         useMaterial3: true,
       ),
-      home: ChatPage(
+      home: AuthGate(
+        authService: widget.authService,
         aiService: widget.aiService,
         chatRepository: widget.chatRepository,
         chatPrefs: widget.chatPrefs,

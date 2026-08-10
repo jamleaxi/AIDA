@@ -2,6 +2,7 @@ import 'package:aida/main.dart';
 import 'package:aida/models/chat_message.dart';
 import 'package:aida/models/conversation_summary.dart';
 import 'package:aida/services/ai_service.dart';
+import 'package:aida/services/auth_service.dart';
 import 'package:aida/services/chat_prefs.dart';
 import 'package:aida/services/chat_repository.dart';
 import 'package:flutter/material.dart';
@@ -19,6 +20,7 @@ void main() {
         aiService: _FakeAiService(),
         chatRepository: _FakeRepository(),
         chatPrefs: ChatPrefs(),
+        authService: _FakeAuthService(),
       ),
     );
     await tester.pumpAndSettle();
@@ -56,4 +58,23 @@ class _FakeRepository implements MessageRepository {
 
   @override
   Future<List<ConversationSummary>> fetchConversations() async => [];
+}
+
+class _FakeAuthService implements AuthService {
+  static const _user = AppUser(id: 'test-user', email: 'test@example.com');
+
+  @override
+  AppUser? get currentUser => _user;
+
+  @override
+  Stream<AppUser?> get userChanges => Stream.value(_user);
+
+  @override
+  Future<void> signIn({required String email, required String password}) async {}
+
+  @override
+  Future<void> signUp({required String email, required String password}) async {}
+
+  @override
+  Future<void> signOut() async {}
 }

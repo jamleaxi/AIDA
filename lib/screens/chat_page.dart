@@ -6,6 +6,7 @@ import 'package:uuid/uuid.dart';
 
 import '../models/chat_message.dart';
 import '../services/ai_service.dart';
+import '../services/auth_service.dart';
 import '../services/chat_prefs.dart';
 import '../services/chat_repository.dart';
 import 'chat_history_page.dart';
@@ -25,11 +26,15 @@ class ChatPage extends StatefulWidget {
     required this.aiService,
     required this.chatRepository,
     required this.chatPrefs,
+    required this.authService,
+    required this.userId,
   });
 
   final AiService aiService;
   final MessageRepository chatRepository;
   final ChatPrefs chatPrefs;
+  final AuthService authService;
+  final String userId;
 
   @override
   State<ChatPage> createState() => _ChatPageState();
@@ -58,7 +63,9 @@ class _ChatPageState extends State<ChatPage> {
   }
 
   Future<void> _bootstrap() async {
-    final lastConversationId = await widget.chatPrefs.getLastConversationId();
+    final lastConversationId = await widget.chatPrefs.getLastConversationId(
+      widget.userId,
+    );
 
     if (!mounted) return;
 
@@ -101,7 +108,7 @@ class _ChatPageState extends State<ChatPage> {
 
   Future<void> _startNewConversation() async {
     final conversationId = _uuid.v4();
-    await widget.chatPrefs.setLastConversationId(conversationId);
+    await widget.chatPrefs.setLastConversationId(widget.userId, conversationId);
 
     if (!mounted) return;
     setState(() {
@@ -130,7 +137,7 @@ class _ChatPageState extends State<ChatPage> {
       }
     }
 
-    await widget.chatPrefs.setLastConversationId(conversationId);
+    await widget.chatPrefs.setLastConversationId(widget.userId, conversationId);
 
     if (!mounted) return;
     setState(() {
@@ -164,6 +171,18 @@ class _ChatPageState extends State<ChatPage> {
 
     if (confirmed == true) {
       await _startNewConversation();
+    }
+  }
+
+  Future<void> _signOut() async {
+    try {
+      await widget.authService.signOut();
+    } catch (error, stackTrace) {
+      debugPrint('Sign out failed: $error\n$stackTrace');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not sign out. Please try again.')),
+      );
     }
   }
 
@@ -293,6 +312,12 @@ class _ChatPageState extends State<ChatPage> {
             onPressed: _isInitializing ? null : _confirmNewChat,
             tooltip: 'New chat',
             icon: const Icon(Icons.add_comment_outlined),
+          ),
+          IconButton(
+            key: const Key('signOutButton'),
+            onPressed: _signOut,
+            tooltip: 'Sign out',
+            icon: const Icon(Icons.logout),
           ),
         ],
       ),
