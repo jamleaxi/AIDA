@@ -213,14 +213,14 @@ class _ChatPageState extends State<ChatPage> {
     });
     _scrollToBottom();
 
-    // Message history is best-effort and must not delay the AI response.
-    unawaited(
-      _saveMessage(
-        conversationId: conversationId,
-        sender: 'user',
-        content: text,
-      ),
+    // Message history is best-effort and must not delay the AI response,
+    // but the assistant's save must wait for this one so rows land in order.
+    final saveUserMessage = _saveMessage(
+      conversationId: conversationId,
+      sender: 'user',
+      content: text,
     );
+    unawaited(saveUserMessage);
 
     try {
       final reply = await widget.aiService.generateReply(text);
@@ -230,6 +230,7 @@ class _ChatPageState extends State<ChatPage> {
         _messages = [..._messages, ChatMessage(text: reply, isUser: false)];
       });
 
+      await saveUserMessage;
       unawaited(
         _saveMessage(
           conversationId: conversationId,

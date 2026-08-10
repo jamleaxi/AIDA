@@ -45,7 +45,7 @@ class ChatRepository implements MessageRepository {
         .eq('conversation_id', conversationId)
         .order('created_at');
 
-    return (rows as List)
+    final messages = (rows as List)
         .map((row) => row as Map<String, dynamic>)
         .map(
           (row) => ChatMessage(
@@ -55,6 +55,23 @@ class ChatRepository implements MessageRepository {
           ),
         )
         .toList();
+
+    return _fixSwappedPairs(messages);
+  }
+
+  // Messages always alternate user -> assistant. Older rows saved before a
+  // race-condition fix can have an assistant reply timestamped just before
+  // its own user message; swap those adjacent pairs back into order.
+  List<ChatMessage> _fixSwappedPairs(List<ChatMessage> messages) {
+    final result = List<ChatMessage>.from(messages);
+    for (var i = 0; i < result.length - 1; i++) {
+      if (!result[i].isUser && result[i + 1].isUser) {
+        final swapped = result[i];
+        result[i] = result[i + 1];
+        result[i + 1] = swapped;
+      }
+    }
+    return result;
   }
 
   @override
