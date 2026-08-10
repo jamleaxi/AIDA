@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'screens/chat_page.dart';
 import 'services/ai_service.dart';
+import 'services/chat_prefs.dart';
 import 'services/chat_repository.dart';
 import 'services/gemini_service.dart';
 import 'services/groq_service.dart';
@@ -69,6 +70,7 @@ Future<void> main() async {
         AiProvider.groq => GroqService(apiKey: groqApiKey),
       },
       chatRepository: ChatRepository(Supabase.instance.client),
+      chatPrefs: ChatPrefs(),
     ),
   );
 }
@@ -78,10 +80,12 @@ class AidaApp extends StatefulWidget {
     super.key,
     required this.aiService,
     required this.chatRepository,
+    required this.chatPrefs,
   });
 
   final AiService aiService;
   final MessageRepository chatRepository;
+  final ChatPrefs chatPrefs;
 
   @override
   State<AidaApp> createState() => _AidaAppState();
@@ -106,6 +110,7 @@ class _AidaAppState extends State<AidaApp> {
       home: ChatPage(
         aiService: widget.aiService,
         chatRepository: widget.chatRepository,
+        chatPrefs: widget.chatPrefs,
       ),
     );
   }

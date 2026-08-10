@@ -1,17 +1,27 @@
 import 'package:aida/main.dart';
+import 'package:aida/models/chat_message.dart';
+import 'package:aida/models/conversation_summary.dart';
 import 'package:aida/services/ai_service.dart';
+import 'package:aida/services/chat_prefs.dart';
 import 'package:aida/services/chat_repository.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
+  setUp(() {
+    SharedPreferences.setMockInitialValues({});
+  });
+
   testWidgets('sends a message and displays a reply', (tester) async {
     await tester.pumpWidget(
       AidaApp(
         aiService: _FakeAiService(),
         chatRepository: _FakeRepository(),
+        chatPrefs: ChatPrefs(),
       ),
     );
+    await tester.pumpAndSettle();
 
     await tester.enterText(
       find.byKey(const Key('messageField')),
@@ -36,7 +46,14 @@ class _FakeAiService implements AiService {
 class _FakeRepository implements MessageRepository {
   @override
   Future<void> saveMessage({
+    required String conversationId,
     required String sender,
     required String content,
   }) async {}
+
+  @override
+  Future<List<ChatMessage>> fetchMessages(String conversationId) async => [];
+
+  @override
+  Future<List<ConversationSummary>> fetchConversations() async => [];
 }

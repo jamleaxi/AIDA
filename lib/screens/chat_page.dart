@@ -2,37 +2,53 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
+import 'package:uuid/uuid.dart';
 
 import '../models/chat_message.dart';
 import '../services/ai_service.dart';
+import '../services/chat_prefs.dart';
 import '../services/chat_repository.dart';
+import 'chat_history_page.dart';
 
-class ChatPage extends StatefulWidget {
-  const ChatPage({
-    super.key,
-    required this.aiService,
-    required this.chatRepository,
-  });
-
-  final AiService aiService;
-  final MessageRepository chatRepository;
-
-  @override
-  State<ChatPage> createState() => _ChatPageState();
-}
+const _uuid = Uuid();
 
 const _greeting = ChatMessage(
   text: 'Hello! I am AIDA. What would you like to learn today?',
   isUser: false,
 );
 
+enum _StartupChoice { continueChat, newChat }
+
+class ChatPage extends StatefulWidget {
+  const ChatPage({
+    super.key,
+    required this.aiService,
+    required this.chatRepository,
+    required this.chatPrefs,
+  });
+
+  final AiService aiService;
+  final MessageRepository chatRepository;
+  final ChatPrefs chatPrefs;
+
+  @override
+  State<ChatPage> createState() => _ChatPageState();
+}
+
 class _ChatPageState extends State<ChatPage> {
   final _controller = TextEditingController();
   final _scrollController = ScrollController();
 
-  final List<ChatMessage> _messages = [_greeting];
-
+  List<ChatMessage> _messages = const [];
+  String? _conversationId;
   bool _isLoading = false;
+  bool _isInitializing = true;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _bootstrap());
+  }
 
   @override
   void dispose() {
@@ -41,45 +57,187 @@ class _ChatPageState extends State<ChatPage> {
     super.dispose();
   }
 
+  Future<void> _bootstrap() async {
+    final lastConversationId = await widget.chatPrefs.getLastConversationId();
+
+    if (!mounted) return;
+
+    if (lastConversationId == null) {
+      await _startNewConversation();
+      return;
+    }
+
+    final choice = await showDialog<_StartupChoice>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: const Text('Welcome back'),
+        content: const Text(
+          'Would you like to continue your last chat or start a new one?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () =>
+                Navigator.of(context).pop(_StartupChoice.newChat),
+            child: const Text('New chat'),
+          ),
+          FilledButton(
+            onPressed: () =>
+                Navigator.of(context).pop(_StartupChoice.continueChat),
+            child: const Text('Continue'),
+          ),
+        ],
+      ),
+    );
+
+    if (!mounted) return;
+
+    if (choice == _StartupChoice.continueChat) {
+      await _loadConversation(lastConversationId);
+    } else {
+      await _startNewConversation();
+    }
+  }
+
+  Future<void> _startNewConversation() async {
+    final conversationId = _uuid.v4();
+    await widget.chatPrefs.setLastConversationId(conversationId);
+
+    if (!mounted) return;
+    setState(() {
+      _conversationId = conversationId;
+      _messages = [_greeting];
+      _isInitializing = false;
+    });
+  }
+
+  Future<void> _loadConversation(String conversationId) async {
+    setState(() => _isInitializing = true);
+
+    List<ChatMessage> messages;
+    try {
+      final fetched = await widget.chatRepository.fetchMessages(
+        conversationId,
+      );
+      messages = fetched.isEmpty ? [_greeting] : fetched;
+    } catch (error, stackTrace) {
+      debugPrint('Could not load conversation $conversationId: $error\n$stackTrace');
+      messages = [_greeting];
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not load that chat.')),
+        );
+      }
+    }
+
+    await widget.chatPrefs.setLastConversationId(conversationId);
+
+    if (!mounted) return;
+    setState(() {
+      _conversationId = conversationId;
+      _messages = messages;
+      _isInitializing = false;
+    });
+    _scrollToBottom();
+  }
+
+  Future<void> _confirmNewChat() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Start a new chat?'),
+        content: const Text(
+          'Your current conversation is saved and you can revisit it from Saved chats.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Start new chat'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      await _startNewConversation();
+    }
+  }
+
+  Future<void> _openHistory() async {
+    final selectedId = await Navigator.of(context).push<String>(
+      MaterialPageRoute(
+        builder: (context) => ChatHistoryPage(
+          chatRepository: widget.chatRepository,
+          currentConversationId: _conversationId,
+        ),
+      ),
+    );
+
+    if (selectedId != null && selectedId != _conversationId) {
+      await _loadConversation(selectedId);
+    }
+  }
+
   Future<void> _sendMessage() async {
     final text = _controller.text.trim();
-    if (text.isEmpty || _isLoading) return;
+    final conversationId = _conversationId;
+    if (text.isEmpty || _isLoading || conversationId == null) return;
 
     setState(() {
-      _messages.add(ChatMessage(text: text, isUser: true));
+      _messages = [..._messages, ChatMessage(text: text, isUser: true)];
       _controller.clear();
       _isLoading = true;
     });
     _scrollToBottom();
 
     // Message history is best-effort and must not delay the AI response.
-    unawaited(_saveMessage(sender: 'user', content: text));
+    unawaited(
+      _saveMessage(
+        conversationId: conversationId,
+        sender: 'user',
+        content: text,
+      ),
+    );
 
     try {
       final reply = await widget.aiService.generateReply(text);
 
       if (!mounted) return;
       setState(() {
-        _messages.add(ChatMessage(text: reply, isUser: false));
+        _messages = [..._messages, ChatMessage(text: reply, isUser: false)];
       });
 
-      unawaited(_saveMessage(sender: 'assistant', content: reply));
+      unawaited(
+        _saveMessage(
+          conversationId: conversationId,
+          sender: 'assistant',
+          content: reply,
+        ),
+      );
     } on AiServiceException catch (error, stackTrace) {
       debugPrint('AI request failed: $error\n$stackTrace');
       if (!mounted) return;
       setState(() {
-        _messages.add(ChatMessage(text: error.userMessage, isUser: false));
+        _messages = [
+          ..._messages,
+          ChatMessage(text: error.userMessage, isUser: false),
+        ];
       });
     } catch (error, stackTrace) {
       debugPrint('Unexpected chat error: $error\n$stackTrace');
       if (!mounted) return;
       setState(() {
-        _messages.add(
+        _messages = [
+          ..._messages,
           const ChatMessage(
             text: 'Sorry, something went wrong. Please try again.',
             isUser: false,
           ),
-        );
+        ];
       });
     } finally {
       if (mounted) {
@@ -90,45 +248,20 @@ class _ChatPageState extends State<ChatPage> {
   }
 
   Future<void> _saveMessage({
+    required String conversationId,
     required String sender,
     required String content,
   }) async {
     try {
-      await widget.chatRepository.saveMessage(sender: sender, content: content);
+      await widget.chatRepository.saveMessage(
+        conversationId: conversationId,
+        sender: sender,
+        content: content,
+      );
     } catch (error, stackTrace) {
       // Saving history should not prevent the user from receiving an AI reply.
       debugPrint('Could not save $sender message: $error\n$stackTrace');
     }
-  }
-
-  Future<void> _clearChat() async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Clear chat?'),
-        content: const Text(
-          'This will remove all messages in this conversation.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Clear'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed != true || !mounted) return;
-
-    setState(() {
-      _messages
-        ..clear()
-        ..add(_greeting);
-    });
   }
 
   void _scrollToBottom() {
@@ -150,39 +283,47 @@ class _ChatPageState extends State<ChatPage> {
         centerTitle: true,
         actions: [
           IconButton(
+            key: const Key('historyButton'),
+            onPressed: _isInitializing ? null : _openHistory,
+            tooltip: 'Saved chats',
+            icon: const Icon(Icons.history),
+          ),
+          IconButton(
             key: const Key('clearChatButton'),
-            onPressed: _clearChat,
-            tooltip: 'Clear chat',
-            icon: const Icon(Icons.delete_outline),
+            onPressed: _isInitializing ? null : _confirmNewChat,
+            tooltip: 'New chat',
+            icon: const Icon(Icons.add_comment_outlined),
           ),
         ],
       ),
       body: SafeArea(
-        child: Column(
-          children: [
-            Expanded(
-              child: ListView.builder(
-                key: const Key('messageList'),
-                controller: _scrollController,
-                padding: const EdgeInsets.all(16),
-                itemCount: _messages.length,
-                itemBuilder: (context, index) {
-                  return MessageBubble(message: _messages[index]);
-                },
+        child: _isInitializing
+            ? const Center(child: CircularProgressIndicator())
+            : Column(
+                children: [
+                  Expanded(
+                    child: ListView.builder(
+                      key: const Key('messageList'),
+                      controller: _scrollController,
+                      padding: const EdgeInsets.all(16),
+                      itemCount: _messages.length,
+                      itemBuilder: (context, index) {
+                        return MessageBubble(message: _messages[index]);
+                      },
+                    ),
+                  ),
+                  if (_isLoading)
+                    const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 16),
+                      child: LinearProgressIndicator(),
+                    ),
+                  _MessageComposer(
+                    controller: _controller,
+                    isLoading: _isLoading,
+                    onSend: _sendMessage,
+                  ),
+                ],
               ),
-            ),
-            if (_isLoading)
-              const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 16),
-                child: LinearProgressIndicator(),
-              ),
-            _MessageComposer(
-              controller: _controller,
-              isLoading: _isLoading,
-              onSend: _sendMessage,
-            ),
-          ],
-        ),
       ),
     );
   }
