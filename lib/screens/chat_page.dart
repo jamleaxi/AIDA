@@ -21,16 +21,16 @@ class ChatPage extends StatefulWidget {
   State<ChatPage> createState() => _ChatPageState();
 }
 
+const _greeting = ChatMessage(
+  text: 'Hello! I am AIDA. What would you like to learn today?',
+  isUser: false,
+);
+
 class _ChatPageState extends State<ChatPage> {
   final _controller = TextEditingController();
   final _scrollController = ScrollController();
 
-  final List<ChatMessage> _messages = const [
-    ChatMessage(
-      text: 'Hello! I am AIDA. What would you like to learn today?',
-      isUser: false,
-    ),
-  ].toList();
+  final List<ChatMessage> _messages = [_greeting];
 
   bool _isLoading = false;
 
@@ -101,6 +101,36 @@ class _ChatPageState extends State<ChatPage> {
     }
   }
 
+  Future<void> _clearChat() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Clear chat?'),
+        content: const Text(
+          'This will remove all messages in this conversation.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Clear'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    setState(() {
+      _messages
+        ..clear()
+        ..add(_greeting);
+    });
+  }
+
   void _scrollToBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || !_scrollController.hasClients) return;
@@ -115,7 +145,18 @@ class _ChatPageState extends State<ChatPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('AIDA'), centerTitle: true),
+      appBar: AppBar(
+        title: const Text('AIDA'),
+        centerTitle: true,
+        actions: [
+          IconButton(
+            key: const Key('clearChatButton'),
+            onPressed: _clearChat,
+            tooltip: 'Clear chat',
+            icon: const Icon(Icons.delete_outline),
+          ),
+        ],
+      ),
       body: SafeArea(
         child: Column(
           children: [
@@ -180,45 +221,45 @@ class MessageBubble extends StatelessWidget {
           child: message.isUser
               ? Text(message.text, style: textStyle)
               : MarkdownBody(
-            data: message.text,
-            selectable: true,
-            softLineBreak: true,
-            imageBuilder: (uri, title, alt) => Text(
-              alt?.isNotEmpty == true ? alt! : 'Image',
-              style: textStyle?.copyWith(fontStyle: FontStyle.italic),
-            ),
-            styleSheet: MarkdownStyleSheet.fromTheme(theme).copyWith(
-              p: textStyle,
-              pPadding: EdgeInsets.zero,
-              strong: textStyle?.copyWith(fontWeight: FontWeight.bold),
-              em: textStyle?.copyWith(fontStyle: FontStyle.italic),
-              blockSpacing: 10,
-              listIndent: 20,
-              code: theme.textTheme.bodySmall?.copyWith(
-                fontFamily: 'monospace',
-                color: theme.colorScheme.onSurfaceVariant,
-                backgroundColor: theme.colorScheme.surfaceContainer,
-              ),
-              codeblockPadding: const EdgeInsets.all(10),
-              codeblockDecoration: BoxDecoration(
-                color: theme.colorScheme.surfaceContainer,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              blockquotePadding: const EdgeInsets.symmetric(
-                horizontal: 10,
-                vertical: 6,
-              ),
-              blockquoteDecoration: BoxDecoration(
-                color: theme.colorScheme.surfaceContainer,
-                border: Border(
-                  left: BorderSide(
-                    color: theme.colorScheme.primary,
-                    width: 3,
+                  data: message.text,
+                  selectable: true,
+                  softLineBreak: true,
+                  imageBuilder: (uri, title, alt) => Text(
+                    alt?.isNotEmpty == true ? alt! : 'Image',
+                    style: textStyle?.copyWith(fontStyle: FontStyle.italic),
+                  ),
+                  styleSheet: MarkdownStyleSheet.fromTheme(theme).copyWith(
+                    p: textStyle,
+                    pPadding: EdgeInsets.zero,
+                    strong: textStyle?.copyWith(fontWeight: FontWeight.bold),
+                    em: textStyle?.copyWith(fontStyle: FontStyle.italic),
+                    blockSpacing: 10,
+                    listIndent: 20,
+                    code: theme.textTheme.bodySmall?.copyWith(
+                      fontFamily: 'monospace',
+                      color: theme.colorScheme.onSurfaceVariant,
+                      backgroundColor: theme.colorScheme.surfaceContainer,
+                    ),
+                    codeblockPadding: const EdgeInsets.all(10),
+                    codeblockDecoration: BoxDecoration(
+                      color: theme.colorScheme.surfaceContainer,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    blockquotePadding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 6,
+                    ),
+                    blockquoteDecoration: BoxDecoration(
+                      color: theme.colorScheme.surfaceContainer,
+                      border: Border(
+                        left: BorderSide(
+                          color: theme.colorScheme.primary,
+                          width: 3,
+                        ),
+                      ),
+                    ),
                   ),
                 ),
-              ),
-            ),
-          ),
         ),
       ),
     );
