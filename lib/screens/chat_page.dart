@@ -91,8 +91,7 @@ class _ChatPageState extends State<ChatPage> {
         ),
         actions: [
           TextButton(
-            onPressed: () =>
-                Navigator.of(context).pop(_StartupChoice.newChat),
+            onPressed: () => Navigator.of(context).pop(_StartupChoice.newChat),
             child: const Text('New chat'),
           ),
           FilledButton(
@@ -130,12 +129,12 @@ class _ChatPageState extends State<ChatPage> {
 
     List<ChatMessage> messages;
     try {
-      final fetched = await widget.chatRepository.fetchMessages(
-        conversationId,
-      );
+      final fetched = await widget.chatRepository.fetchMessages(conversationId);
       messages = fetched.isEmpty ? [_greeting] : fetched;
     } catch (error, stackTrace) {
-      debugPrint('Could not load conversation $conversationId: $error\n$stackTrace');
+      debugPrint(
+        'Could not load conversation $conversationId: $error\n$stackTrace',
+      );
       messages = [_greeting];
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -216,7 +215,6 @@ class _ChatPageState extends State<ChatPage> {
     setState(() {
       _messages = [..._messages, ChatMessage(text: text, isUser: true)];
       _controller.clear();
-      _isLoading = true;
     });
     _scrollToBottom();
 
@@ -229,6 +227,36 @@ class _ChatPageState extends State<ChatPage> {
     );
     unawaited(saveUserMessage);
 
+    await _requestReply(
+      text: text,
+      conversationId: conversationId,
+      pendingUserSave: saveUserMessage,
+    );
+  }
+
+  Future<void> _retryMessage(int index) async {
+    final conversationId = _conversationId;
+    if (conversationId == null || _isLoading) return;
+    if (index <= 0 || index >= _messages.length) return;
+    if (!_messages[index].isError) return;
+
+    final userMessage = _messages[index - 1];
+    if (!userMessage.isUser) return;
+
+    setState(() {
+      _messages = List<ChatMessage>.from(_messages)..removeAt(index);
+    });
+
+    await _requestReply(text: userMessage.text, conversationId: conversationId);
+  }
+
+  Future<void> _requestReply({
+    required String text,
+    required String conversationId,
+    Future<void>? pendingUserSave,
+  }) async {
+    setState(() => _isLoading = true);
+
     try {
       final reply = await widget.aiProviderController.activeService
           .generateReply(text);
@@ -238,7 +266,7 @@ class _ChatPageState extends State<ChatPage> {
         _messages = [..._messages, ChatMessage(text: reply, isUser: false)];
       });
 
-      await saveUserMessage;
+      if (pendingUserSave != null) await pendingUserSave;
       unawaited(
         _saveMessage(
           conversationId: conversationId,
@@ -252,7 +280,7 @@ class _ChatPageState extends State<ChatPage> {
       setState(() {
         _messages = [
           ..._messages,
-          ChatMessage(text: error.userMessage, isUser: false),
+          ChatMessage(text: error.userMessage, isUser: false, isError: true),
         ];
       });
     } catch (error, stackTrace) {
@@ -264,6 +292,7 @@ class _ChatPageState extends State<ChatPage> {
           const ChatMessage(
             text: 'Sorry, something went wrong. Please try again.',
             isUser: false,
+            isError: true,
           ),
         ];
       });
@@ -343,7 +372,13 @@ class _ChatPageState extends State<ChatPage> {
                       padding: const EdgeInsets.all(16),
                       itemCount: _messages.length,
                       itemBuilder: (context, index) {
-                        return MessageBubble(message: _messages[index]);
+                        final message = _messages[index];
+                        return MessageBubble(
+                          message: message,
+                          onRetry: message.isError && !_isLoading
+                              ? () => _retryMessage(index)
+                              : null,
+                        );
                       },
                     ),
                   ),
@@ -365,9 +400,10 @@ class _ChatPageState extends State<ChatPage> {
 }
 
 class MessageBubble extends StatelessWidget {
-  const MessageBubble({super.key, required this.message});
+  const MessageBubble({super.key, required this.message, this.onRetry});
 
   final ChatMessage message;
+  final VoidCallback? onRetry;
 
   @override
   Widget build(BuildContext context) {
@@ -375,11 +411,15 @@ class MessageBubble extends StatelessWidget {
     final alignment = message.isUser
         ? Alignment.centerRight
         : Alignment.centerLeft;
-    final color = message.isUser
+    final color = message.isError
+        ? theme.colorScheme.errorContainer
+        : message.isUser
         ? theme.colorScheme.primaryContainer
         : theme.colorScheme.surfaceContainerHighest;
     final textStyle = theme.textTheme.bodyMedium?.copyWith(
-      color: theme.colorScheme.onSurface,
+      color: message.isError
+          ? theme.colorScheme.onErrorContainer
+          : theme.colorScheme.onSurface,
       height: 1.35,
     );
 
@@ -387,55 +427,78 @@ class MessageBubble extends StatelessWidget {
       alignment: alignment,
       child: FractionallySizedBox(
         widthFactor: 0.82,
-        child: Container(
-          margin: const EdgeInsets.only(bottom: 10),
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-          decoration: BoxDecoration(
-            color: color,
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: message.isUser
-              ? Text(message.text, style: textStyle)
-              : MarkdownBody(
-                  data: message.text,
-                  selectable: true,
-                  softLineBreak: true,
-                  imageBuilder: (uri, title, alt) => Text(
-                    alt?.isNotEmpty == true ? alt! : 'Image',
-                    style: textStyle?.copyWith(fontStyle: FontStyle.italic),
-                  ),
-                  styleSheet: MarkdownStyleSheet.fromTheme(theme).copyWith(
-                    p: textStyle,
-                    pPadding: EdgeInsets.zero,
-                    strong: textStyle?.copyWith(fontWeight: FontWeight.bold),
-                    em: textStyle?.copyWith(fontStyle: FontStyle.italic),
-                    blockSpacing: 10,
-                    listIndent: 20,
-                    code: theme.textTheme.bodySmall?.copyWith(
-                      fontFamily: 'monospace',
-                      color: theme.colorScheme.onSurfaceVariant,
-                      backgroundColor: theme.colorScheme.surfaceContainer,
-                    ),
-                    codeblockPadding: const EdgeInsets.all(10),
-                    codeblockDecoration: BoxDecoration(
-                      color: theme.colorScheme.surfaceContainer,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    blockquotePadding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 6,
-                    ),
-                    blockquoteDecoration: BoxDecoration(
-                      color: theme.colorScheme.surfaceContainer,
-                      border: Border(
-                        left: BorderSide(
-                          color: theme.colorScheme.primary,
-                          width: 3,
+        child: Column(
+          crossAxisAlignment: message.isUser
+              ? CrossAxisAlignment.end
+              : CrossAxisAlignment.start,
+          children: [
+            Container(
+              margin: const EdgeInsets.only(bottom: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: color,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: message.isUser
+                  ? Text(message.text, style: textStyle)
+                  : MarkdownBody(
+                      data: message.text,
+                      selectable: true,
+                      softLineBreak: true,
+                      imageBuilder: (uri, title, alt) => Text(
+                        alt?.isNotEmpty == true ? alt! : 'Image',
+                        style: textStyle?.copyWith(fontStyle: FontStyle.italic),
+                      ),
+                      styleSheet: MarkdownStyleSheet.fromTheme(theme).copyWith(
+                        p: textStyle,
+                        pPadding: EdgeInsets.zero,
+                        strong: textStyle?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                        em: textStyle?.copyWith(fontStyle: FontStyle.italic),
+                        blockSpacing: 10,
+                        listIndent: 20,
+                        code: theme.textTheme.bodySmall?.copyWith(
+                          fontFamily: 'monospace',
+                          color: theme.colorScheme.onSurfaceVariant,
+                          backgroundColor: theme.colorScheme.surfaceContainer,
+                        ),
+                        codeblockPadding: const EdgeInsets.all(10),
+                        codeblockDecoration: BoxDecoration(
+                          color: theme.colorScheme.surfaceContainer,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        blockquotePadding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 6,
+                        ),
+                        blockquoteDecoration: BoxDecoration(
+                          color: theme.colorScheme.surfaceContainer,
+                          border: Border(
+                            left: BorderSide(
+                              color: theme.colorScheme.primary,
+                              width: 3,
+                            ),
+                          ),
                         ),
                       ),
                     ),
+            ),
+            if (message.isError && onRetry != null)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: TextButton.icon(
+                  onPressed: onRetry,
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    minimumSize: Size.zero,
+                    visualDensity: VisualDensity.compact,
                   ),
+                  icon: const Icon(Icons.refresh, size: 16),
+                  label: const Text('Retry'),
                 ),
+              ),
+          ],
         ),
       ),
     );

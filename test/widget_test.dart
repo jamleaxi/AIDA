@@ -39,11 +39,61 @@ void main() {
     expect(find.text('Hello'), findsOneWidget);
     expect(find.text('Test reply'), findsOneWidget);
   });
+
+  testWidgets('retries a failed message and shows the reply', (tester) async {
+    final flakyService = _FlakyAiService();
+
+    await tester.pumpWidget(
+      AidaApp(
+        aiProviderController: AiProviderController(
+          services: {AiProvider.gemini: flakyService},
+          initialProvider: AiProvider.gemini,
+        ),
+        chatRepository: _FakeRepository(),
+        chatPrefs: ChatPrefs(),
+        authService: _FakeAuthService(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.byKey(const Key('messageField')),
+      'Hello',
+    );
+    await tester.tap(find.byKey(const Key('sendButton')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Network error. Please try again.'), findsOneWidget);
+    expect(find.text('Retry'), findsOneWidget);
+
+    await tester.tap(find.text('Retry'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Network error. Please try again.'), findsNothing);
+    expect(find.text('Retry'), findsNothing);
+    expect(find.text('Recovered reply'), findsOneWidget);
+  });
 }
 
 class _FakeAiService implements AiService {
   @override
   Future<String> generateReply(String userMessage) async => 'Test reply';
+
+  @override
+  void close() {}
+}
+
+class _FlakyAiService implements AiService {
+  var _callCount = 0;
+
+  @override
+  Future<String> generateReply(String userMessage) async {
+    _callCount++;
+    if (_callCount == 1) {
+      throw const AiServiceException('Network error. Please try again.');
+    }
+    return 'Recovered reply';
+  }
 
   @override
   void close() {}
