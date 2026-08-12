@@ -8,8 +8,7 @@ import 'services/ai_service.dart';
 import 'services/auth_service.dart';
 import 'services/chat_prefs.dart';
 import 'services/chat_repository.dart';
-import 'services/gemini_service.dart';
-import 'services/groq_service.dart';
+import 'services/edge_function_ai_service.dart';
 import 'services/supabase_auth_service.dart';
 
 Future<void> main() async {
@@ -21,7 +20,7 @@ Future<void> main() async {
     runApp(
       const StartupErrorApp(
         message:
-        'Could not load .env. Copy .env.example to .env and add your configuration.',
+            'Could not load .env. Copy .env.example to .env and add your configuration.',
       ),
     );
     return;
@@ -29,8 +28,6 @@ Future<void> main() async {
 
   final supabaseUrl = dotenv.maybeGet('SUPABASE_URL')?.trim() ?? '';
   final supabaseKey = dotenv.maybeGet('SUPABASE_KEY')?.trim() ?? '';
-  final geminiApiKey = dotenv.maybeGet('GEMINI_API_KEY')?.trim() ?? '';
-  final groqApiKey = dotenv.maybeGet('GROQ_API_KEY')?.trim() ?? '';
   final providerName = dotenv.maybeGet('AI_PROVIDER')?.trim() ?? 'gemini';
   final provider = AiProvider.tryParse(providerName);
 
@@ -38,7 +35,7 @@ Future<void> main() async {
     runApp(
       StartupErrorApp(
         message:
-        'Invalid AI_PROVIDER: "$providerName". Use "gemini" or "groq".',
+            'Invalid AI_PROVIDER: "$providerName". Use "gemini" or "groq".',
       ),
     );
     return;
@@ -47,8 +44,6 @@ Future<void> main() async {
   final missingConfiguration = <String>[
     if (supabaseUrl.isEmpty) 'SUPABASE_URL',
     if (supabaseKey.isEmpty) 'SUPABASE_KEY',
-    if (provider == AiProvider.gemini && geminiApiKey.isEmpty) 'GEMINI_API_KEY',
-    if (provider == AiProvider.groq && groqApiKey.isEmpty) 'GROQ_API_KEY',
   ];
   if (missingConfiguration.isNotEmpty) {
     runApp(
@@ -68,10 +63,14 @@ Future<void> main() async {
 
   final aiProviderController = AiProviderController(
     services: {
-      if (geminiApiKey.isNotEmpty)
-        AiProvider.gemini: GeminiService(apiKey: geminiApiKey),
-      if (groqApiKey.isNotEmpty)
-        AiProvider.groq: GroqService(apiKey: groqApiKey),
+      AiProvider.gemini: EdgeFunctionAiService(
+        Supabase.instance.client,
+        AiProvider.gemini,
+      ),
+      AiProvider.groq: EdgeFunctionAiService(
+        Supabase.instance.client,
+        AiProvider.groq,
+      ),
     },
     initialProvider: provider,
   );
