@@ -27,6 +27,9 @@ class AiProviderController extends ChangeNotifier {
   /// only [select] does.
   AiProvider _preferred;
 
+  /// Providers that failed their most recent request.
+  final Set<AiProvider> _down = {};
+
   AiProvider get current => _current;
 
   AiProvider get preferred => _preferred;
@@ -34,6 +37,11 @@ class AiProviderController extends ChangeNotifier {
   List<AiProvider> get availableProviders => _services.keys.toList();
 
   AiService get activeService => _services[_current]!;
+
+  bool isDown(AiProvider provider) => _down.contains(provider);
+
+  /// True only when every configured provider failed its last request.
+  bool get allProvidersDown => _down.length == _services.length;
 
   /// Explicitly switches providers. This is the user's override: it always
   /// takes effect immediately and becomes the new preference for future
@@ -62,7 +70,8 @@ class AiProviderController extends ChangeNotifier {
     for (final provider in order) {
       try {
         final reply = await _services[provider]!.generateReply(userMessage);
-        if (provider != _current) {
+        final wasDown = _down.remove(provider);
+        if (provider != _current || wasDown) {
           _current = provider;
           notifyListeners();
         }
@@ -70,6 +79,7 @@ class AiProviderController extends ChangeNotifier {
       } catch (error, stackTrace) {
         lastError = error;
         lastStackTrace = stackTrace;
+        if (_down.add(provider)) notifyListeners();
       }
     }
 

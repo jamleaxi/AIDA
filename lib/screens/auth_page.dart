@@ -91,10 +91,26 @@ class _AuthPageState extends State<AuthPage> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Text(
-                      'AIDA',
-                      style: theme.textTheme.headlineMedium,
-                      textAlign: TextAlign.center,
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        ClipOval(
+                          child: Image.asset(
+                            'lib/assets/aida.png',
+                            width: 64,
+                            height: 64,
+                            fit: BoxFit.cover,
+                          ),
+                        ),
+                        const SizedBox(width: 14),
+                        Flexible(
+                          child: Image.asset(
+                            'lib/assets/aida-tag.png',
+                            height: 48,
+                            fit: BoxFit.contain,
+                          ),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 8),
                     Text(
@@ -109,10 +125,7 @@ class _AuthPageState extends State<AuthPage> {
                       enabled: !_isSubmitting,
                       keyboardType: TextInputType.emailAddress,
                       autocorrect: false,
-                      decoration: const InputDecoration(
-                        labelText: 'Email',
-                        border: OutlineInputBorder(),
-                      ),
+                      decoration: const InputDecoration(labelText: 'Email'),
                       validator: (value) {
                         final email = value?.trim() ?? '';
                         if (email.isEmpty || !email.contains('@')) {
@@ -127,10 +140,7 @@ class _AuthPageState extends State<AuthPage> {
                       controller: _passwordController,
                       enabled: !_isSubmitting,
                       obscureText: true,
-                      decoration: const InputDecoration(
-                        labelText: 'Password',
-                        border: OutlineInputBorder(),
-                      ),
+                      decoration: const InputDecoration(labelText: 'Password'),
                       validator: (value) {
                         if ((value ?? '').length < 6) {
                           return 'Password must be at least 6 characters';

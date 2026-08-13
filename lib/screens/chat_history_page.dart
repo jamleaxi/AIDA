@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 
 import '../models/conversation_summary.dart';
 import '../services/chat_repository.dart';
+import '../utils/philippine_time.dart';
 
 class ChatHistoryPage extends StatefulWidget {
   const ChatHistoryPage({
@@ -88,7 +89,7 @@ class _ChatHistoryPageState extends State<ChatHistoryPage> {
                   overflow: TextOverflow.ellipsis,
                 ),
                 subtitle: Text(
-                  '${dateFormat.format(conversation.updatedAt.toLocal())} · '
+                  '${dateFormat.format(conversation.updatedAt.toPhilippineTime)} · '
                   '${conversation.messageCount} message'
                   '${conversation.messageCount == 1 ? '' : 's'}',
                 ),

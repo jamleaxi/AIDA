@@ -43,7 +43,7 @@ class ChatRepository implements MessageRepository {
         .from('messages')
         .select('sender, content, created_at')
         .eq('conversation_id', conversationId)
-        .order('created_at');
+        .order('created_at', ascending: true);
 
     final messages = (rows as List)
         .map((row) => row as Map<String, dynamic>)
@@ -79,7 +79,7 @@ class ChatRepository implements MessageRepository {
     final rows = await _client
         .from('messages')
         .select('conversation_id, sender, content, created_at')
-        .order('created_at');
+        .order('created_at', ascending: true);
 
     final byConversation = <String, List<Map<String, dynamic>>>{};
     for (final row in rows as List) {

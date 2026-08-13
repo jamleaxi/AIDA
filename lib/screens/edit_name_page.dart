@@ -3,41 +3,28 @@ import 'package:flutter/material.dart';
 import '../models/user_profile.dart';
 import '../services/profile_repository.dart';
 
-class OnboardingPage extends StatefulWidget {
-  const OnboardingPage({
+class EditNamePage extends StatefulWidget {
+  const EditNamePage({
     super.key,
-    required this.userId,
+    required this.profile,
     required this.profileRepository,
-    required this.onComplete,
-    this.initialProfile,
   });
 
-  final String userId;
+  final UserProfile profile;
   final ProfileRepository profileRepository;
-  final ValueChanged<UserProfile> onComplete;
-  final UserProfile? initialProfile;
-
-  bool get isEditing => initialProfile != null;
 
   @override
-  State<OnboardingPage> createState() => _OnboardingPageState();
+  State<EditNamePage> createState() => _EditNamePageState();
 }
 
-class _OnboardingPageState extends State<OnboardingPage> {
+class _EditNamePageState extends State<EditNamePage> {
   final _formKey = GlobalKey<FormState>();
   late final _nameController = TextEditingController(
-    text: widget.initialProfile?.displayName ?? '',
+    text: widget.profile.displayName,
   );
 
-  Gender? _gender;
   bool _isSubmitting = false;
   String? _errorMessage;
-
-  @override
-  void initState() {
-    super.initState();
-    _gender = widget.initialProfile?.gender;
-  }
 
   @override
   void dispose() {
@@ -46,14 +33,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
   }
 
   Future<void> _submit() async {
-    if (_isSubmitting) return;
-    final isNameValid = _formKey.currentState?.validate() ?? false;
-    if (!isNameValid || _gender == null) {
-      setState(() {
-        _errorMessage = _gender == null ? 'Please select an option' : null;
-      });
-      return;
-    }
+    if (_isSubmitting || !(_formKey.currentState?.validate() ?? false)) return;
 
     setState(() {
       _isSubmitting = true;
@@ -61,20 +41,23 @@ class _OnboardingPageState extends State<OnboardingPage> {
     });
 
     final displayName = _nameController.text.trim();
-    final gender = _gender!;
 
     try {
       await widget.profileRepository.saveProfile(
-        userId: widget.userId,
+        userId: widget.profile.id,
         displayName: displayName,
-        gender: gender,
+        gender: widget.profile.gender,
       );
       if (!mounted) return;
-      widget.onComplete(
-        UserProfile(id: widget.userId, displayName: displayName, gender: gender),
+      Navigator.of(context).pop(
+        UserProfile(
+          id: widget.profile.id,
+          displayName: displayName,
+          gender: widget.profile.gender,
+        ),
       );
     } catch (error, stackTrace) {
-      debugPrint('Onboarding error: $error\n$stackTrace');
+      debugPrint('Change name error: $error\n$stackTrace');
       if (!mounted) return;
       setState(
         () => _errorMessage = 'Something went wrong. Please try again.',
@@ -89,9 +72,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
     final theme = Theme.of(context);
 
     return Scaffold(
-      appBar: widget.isEditing
-          ? AppBar(title: const Text('Edit profile'))
-          : null,
+      appBar: AppBar(title: const Text('Change name')),
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -104,14 +85,6 @@ class _OnboardingPageState extends State<OnboardingPage> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    if (!widget.isEditing) ...[
-                      Text(
-                        'Welcome to AIDA',
-                        style: theme.textTheme.headlineMedium,
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 24),
-                    ],
                     Text(
                       'What should I call you?',
                       style: theme.textTheme.titleMedium,
@@ -130,31 +103,6 @@ class _OnboardingPageState extends State<OnboardingPage> {
                         return null;
                       },
                     ),
-                    const SizedBox(height: 24),
-                    Text(
-                      'How do you identify?',
-                      style: theme.textTheme.titleMedium,
-                    ),
-                    const SizedBox(height: 8),
-                    RadioGroup<Gender>(
-                      groupValue: _gender,
-                      onChanged: (value) {
-                        if (_isSubmitting) return;
-                        setState(() => _gender = value);
-                      },
-                      child: Column(
-                        children: Gender.values
-                            .map(
-                              (gender) => RadioListTile<Gender>(
-                                key: Key('genderOption_${gender.value}'),
-                                title: Text(gender.label),
-                                value: gender,
-                                contentPadding: EdgeInsets.zero,
-                              ),
-                            )
-                            .toList(),
-                      ),
-                    ),
                     if (_errorMessage != null) ...[
                       const SizedBox(height: 8),
                       Text(
@@ -164,17 +112,15 @@ class _OnboardingPageState extends State<OnboardingPage> {
                     ],
                     const SizedBox(height: 20),
                     FilledButton(
-                      key: const Key('onboardingSubmitButton'),
+                      key: const Key('saveNameButton'),
                       onPressed: _isSubmitting ? null : _submit,
                       child: _isSubmitting
                           ? const SizedBox(
                               height: 18,
                               width: 18,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                              ),
+                              child: CircularProgressIndicator(strokeWidth: 2),
                             )
-                          : Text(widget.isEditing ? 'Save' : 'Continue'),
+                          : const Text('Save'),
                     ),
                   ],
                 ),

@@ -3,8 +3,10 @@ import 'package:flutter/material.dart';
 import '../models/user_profile.dart';
 import '../services/ai_provider_controller.dart';
 import '../services/auth_service.dart';
+import '../services/chat_preferences_controller.dart';
 import '../services/chat_repository.dart';
 import '../services/profile_repository.dart';
+import '../services/theme_controller.dart';
 import 'auth_page.dart';
 import 'chat_page.dart';
 import 'onboarding_page.dart';
@@ -16,12 +18,16 @@ class AuthGate extends StatelessWidget {
     required this.aiProviderController,
     required this.chatRepository,
     required this.profileRepository,
+    required this.themeController,
+    required this.chatPreferencesController,
   });
 
   final AuthService authService;
   final AiProviderController aiProviderController;
   final MessageRepository chatRepository;
   final ProfileRepository profileRepository;
+  final ThemeController themeController;
+  final ChatPreferencesController chatPreferencesController;
 
   @override
   Widget build(BuildContext context) {
@@ -41,6 +47,8 @@ class AuthGate extends StatelessWidget {
           aiProviderController: aiProviderController,
           chatRepository: chatRepository,
           authService: authService,
+          themeController: themeController,
+          chatPreferencesController: chatPreferencesController,
         );
       },
     );
@@ -55,6 +63,8 @@ class _ProfileGate extends StatefulWidget {
     required this.aiProviderController,
     required this.chatRepository,
     required this.authService,
+    required this.themeController,
+    required this.chatPreferencesController,
   });
 
   final String userId;
@@ -62,6 +72,8 @@ class _ProfileGate extends StatefulWidget {
   final AiProviderController aiProviderController;
   final MessageRepository chatRepository;
   final AuthService authService;
+  final ThemeController themeController;
+  final ChatPreferencesController chatPreferencesController;
 
   @override
   State<_ProfileGate> createState() => _ProfileGateState();
@@ -107,6 +119,8 @@ class _ProfileGateState extends State<_ProfileGate> {
           chatRepository: widget.chatRepository,
           authService: widget.authService,
           profileRepository: widget.profileRepository,
+          themeController: widget.themeController,
+          chatPreferencesController: widget.chatPreferencesController,
           profile: profile,
         );
       },
