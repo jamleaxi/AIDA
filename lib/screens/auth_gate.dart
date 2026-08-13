@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../services/ai_provider_controller.dart';
 import '../services/auth_service.dart';
-import '../services/chat_prefs.dart';
 import '../services/chat_repository.dart';
 import 'auth_page.dart';
 import 'chat_page.dart';
@@ -13,13 +12,11 @@ class AuthGate extends StatelessWidget {
     required this.authService,
     required this.aiProviderController,
     required this.chatRepository,
-    required this.chatPrefs,
   });
 
   final AuthService authService;
   final AiProviderController aiProviderController;
   final MessageRepository chatRepository;
-  final ChatPrefs chatPrefs;
 
   @override
   Widget build(BuildContext context) {
@@ -36,9 +33,7 @@ class AuthGate extends StatelessWidget {
           key: ValueKey(user.id),
           aiProviderController: aiProviderController,
           chatRepository: chatRepository,
-          chatPrefs: chatPrefs,
           authService: authService,
-          userId: user.id,
         );
       },
     );

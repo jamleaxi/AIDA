@@ -4,17 +4,11 @@ import 'package:aida/models/conversation_summary.dart';
 import 'package:aida/services/ai_provider_controller.dart';
 import 'package:aida/services/ai_service.dart';
 import 'package:aida/services/auth_service.dart';
-import 'package:aida/services/chat_prefs.dart';
 import 'package:aida/services/chat_repository.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
-  setUp(() {
-    SharedPreferences.setMockInitialValues({});
-  });
-
   testWidgets('sends a message and displays a reply', (tester) async {
     await tester.pumpWidget(
       AidaApp(
@@ -23,7 +17,6 @@ void main() {
           initialProvider: AiProvider.gemini,
         ),
         chatRepository: _FakeRepository(),
-        chatPrefs: ChatPrefs(),
         authService: _FakeAuthService(),
       ),
     );
@@ -50,7 +43,6 @@ void main() {
           initialProvider: AiProvider.gemini,
         ),
         chatRepository: _FakeRepository(),
-        chatPrefs: ChatPrefs(),
         authService: _FakeAuthService(),
       ),
     );

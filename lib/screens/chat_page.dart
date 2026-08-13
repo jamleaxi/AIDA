@@ -8,7 +8,6 @@ import '../models/chat_message.dart';
 import '../services/ai_provider_controller.dart';
 import '../services/ai_service.dart';
 import '../services/auth_service.dart';
-import '../services/chat_prefs.dart';
 import '../services/chat_repository.dart';
 import 'chat_history_page.dart';
 
@@ -19,23 +18,17 @@ const _greeting = ChatMessage(
   isUser: false,
 );
 
-enum _StartupChoice { continueChat, newChat }
-
 class ChatPage extends StatefulWidget {
   const ChatPage({
     super.key,
     required this.aiProviderController,
     required this.chatRepository,
-    required this.chatPrefs,
     required this.authService,
-    required this.userId,
   });
 
   final AiProviderController aiProviderController;
   final MessageRepository chatRepository;
-  final ChatPrefs chatPrefs;
   final AuthService authService;
-  final String userId;
 
   @override
   State<ChatPage> createState() => _ChatPageState();
@@ -54,7 +47,9 @@ class _ChatPageState extends State<ChatPage> {
   void initState() {
     super.initState();
     widget.aiProviderController.addListener(_onProviderChanged);
-    WidgetsBinding.instance.addPostFrameCallback((_) => _bootstrap());
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => _startNewConversation(),
+    );
   }
 
   @override
@@ -69,56 +64,9 @@ class _ChatPageState extends State<ChatPage> {
     if (mounted) setState(() {});
   }
 
-  Future<void> _bootstrap() async {
-    final lastConversationId = await widget.chatPrefs.getLastConversationId(
-      widget.userId,
-    );
-
-    if (!mounted) return;
-
-    if (lastConversationId == null) {
-      await _startNewConversation();
-      return;
-    }
-
-    final choice = await showDialog<_StartupChoice>(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        title: const Text('Welcome back'),
-        content: const Text(
-          'Would you like to continue your last chat or start a new one?',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(_StartupChoice.newChat),
-            child: const Text('New chat'),
-          ),
-          FilledButton(
-            onPressed: () =>
-                Navigator.of(context).pop(_StartupChoice.continueChat),
-            child: const Text('Continue'),
-          ),
-        ],
-      ),
-    );
-
-    if (!mounted) return;
-
-    if (choice == _StartupChoice.continueChat) {
-      await _loadConversation(lastConversationId);
-    } else {
-      await _startNewConversation();
-    }
-  }
-
-  Future<void> _startNewConversation() async {
-    final conversationId = _uuid.v4();
-    await widget.chatPrefs.setLastConversationId(widget.userId, conversationId);
-
-    if (!mounted) return;
+  void _startNewConversation() {
     setState(() {
-      _conversationId = conversationId;
+      _conversationId = _uuid.v4();
       _messages = [_greeting];
       _isInitializing = false;
     });
@@ -142,8 +90,6 @@ class _ChatPageState extends State<ChatPage> {
         );
       }
     }
-
-    await widget.chatPrefs.setLastConversationId(widget.userId, conversationId);
 
     if (!mounted) return;
     setState(() {
@@ -176,7 +122,7 @@ class _ChatPageState extends State<ChatPage> {
     );
 
     if (confirmed == true) {
-      await _startNewConversation();
+      _startNewConversation();
     }
   }
 

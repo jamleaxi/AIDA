@@ -6,7 +6,6 @@ import 'screens/auth_gate.dart';
 import 'services/ai_provider_controller.dart';
 import 'services/ai_service.dart';
 import 'services/auth_service.dart';
-import 'services/chat_prefs.dart';
 import 'services/chat_repository.dart';
 import 'services/edge_function_ai_service.dart';
 import 'services/supabase_auth_service.dart';
@@ -79,7 +78,6 @@ Future<void> main() async {
     AidaApp(
       aiProviderController: aiProviderController,
       chatRepository: ChatRepository(Supabase.instance.client),
-      chatPrefs: ChatPrefs(),
       authService: SupabaseAuthService(Supabase.instance.client),
     ),
   );
@@ -90,13 +88,11 @@ class AidaApp extends StatefulWidget {
     super.key,
     required this.aiProviderController,
     required this.chatRepository,
-    required this.chatPrefs,
     required this.authService,
   });
 
   final AiProviderController aiProviderController;
   final MessageRepository chatRepository;
-  final ChatPrefs chatPrefs;
   final AuthService authService;
 
   @override
@@ -123,7 +119,6 @@ class _AidaAppState extends State<AidaApp> {
         authService: widget.authService,
         aiProviderController: widget.aiProviderController,
         chatRepository: widget.chatRepository,
-        chatPrefs: widget.chatPrefs,
       ),
     );
   }
