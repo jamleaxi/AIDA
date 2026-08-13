@@ -953,17 +953,6 @@ class _MessageComposer extends StatelessWidget {
   final bool isLoading;
   final VoidCallback onSend;
 
-  void _insertEmoji(String emoji) {
-    final selection = controller.selection;
-    final text = controller.text;
-    final insertAt = selection.isValid ? selection.start : text.length;
-    final newText = text.replaceRange(insertAt, selection.isValid ? selection.end : text.length, emoji);
-    controller.value = controller.value.copyWith(
-      text: newText,
-      selection: TextSelection.collapsed(offset: insertAt + emoji.length),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -974,12 +963,7 @@ class _MessageComposer extends StatelessWidget {
       child: Container(
         decoration: BoxDecoration(
           color: isDark ? AidaColors.surfaceDark : Colors.white,
-          borderRadius: const BorderRadius.only(
-            topLeft: Radius.circular(20),
-            topRight: Radius.circular(20),
-            bottomRight: Radius.circular(20),
-            bottomLeft: Radius.circular(4),
-          ),
+          borderRadius: BorderRadius.circular(28),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.08),
@@ -1002,17 +986,8 @@ class _MessageComposer extends StatelessWidget {
                 decoration: const InputDecoration(
                   hintText: 'Type a message...',
                   border: InputBorder.none,
-                  contentPadding: EdgeInsets.fromLTRB(18, 12, 4, 12),
+                  contentPadding: EdgeInsets.fromLTRB(20, 14, 8, 14),
                 ),
-              ),
-            ),
-            IconButton(
-              key: const Key('emojiButton'),
-              onPressed: isLoading ? null : () => _insertEmoji('🙂'),
-              tooltip: 'Insert emoji',
-              icon: Icon(
-                Icons.emoji_emotions_outlined,
-                color: theme.colorScheme.onSurfaceVariant,
               ),
             ),
             Padding(
