@@ -1,8 +1,10 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:intl/intl.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:uuid/uuid.dart';
 
 import '../models/chat_message.dart';
@@ -422,6 +424,8 @@ class _ChatPageState extends State<ChatPage> {
                           showTimestamp:
                               widget.chatPreferencesController.showTimestamps,
                           showName: widget.chatPreferencesController.showNames,
+                          showActions:
+                              widget.chatPreferencesController.showBubbleActions,
                           onRetry: message.isError && !_isLoading
                               ? () => _retryMessage(index)
                               : null,
@@ -515,6 +519,10 @@ class _ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
       case 'toggle_names':
         chatPreferencesController.setShowNames(
           !chatPreferencesController.showNames,
+        );
+      case 'toggle_bubble_actions':
+        chatPreferencesController.setShowBubbleActions(
+          !chatPreferencesController.showBubbleActions,
         );
       case 'about':
         onAbout();
@@ -740,6 +748,29 @@ class _ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
                         ],
                       ),
                     ),
+                    PopupMenuItem<String>(
+                      value: 'toggle_bubble_actions',
+                      key: const Key('toggleBubbleActionsMenuItem'),
+                      child: Row(
+                        children: [
+                          const _MenuIconBadge(
+                            icon: Icons.ios_share_outlined,
+                            color: Color(0xFF10B981),
+                          ),
+                          const SizedBox(width: 12),
+                          const Expanded(child: Text('Show copy/forward')),
+                          Switch(
+                            value: chatPreferencesController.showBubbleActions,
+                            onChanged: (value) {
+                              Navigator.of(context).pop();
+                              chatPreferencesController.setShowBubbleActions(
+                                value,
+                              );
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
                     const PopupMenuDivider(),
                     PopupMenuItem<String>(
                       value: 'about',
@@ -792,6 +823,7 @@ class MessageBubble extends StatelessWidget {
     required this.userName,
     required this.showTimestamp,
     required this.showName,
+    required this.showActions,
     this.onRetry,
   });
 
@@ -800,7 +832,19 @@ class MessageBubble extends StatelessWidget {
   final String userName;
   final bool showTimestamp;
   final bool showName;
+  final bool showActions;
   final VoidCallback? onRetry;
+
+  void _copyMessage(BuildContext context) {
+    Clipboard.setData(ClipboardData(text: message.text));
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Copied to clipboard'), duration: Duration(seconds: 1)),
+    );
+  }
+
+  void _forwardMessage() {
+    SharePlus.instance.share(ShareParams(text: message.text));
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -906,6 +950,23 @@ class MessageBubble extends StatelessWidget {
               ),
             ),
           ),
+        if (showActions && !message.isError)
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _BubbleActionButton(
+                icon: Icons.copy_rounded,
+                tooltip: 'Copy',
+                onPressed: () => _copyMessage(context),
+              ),
+              const SizedBox(width: 2),
+              _BubbleActionButton(
+                icon: Icons.forward_rounded,
+                tooltip: 'Forward',
+                onPressed: _forwardMessage,
+              ),
+            ],
+          ),
         if (message.isError && onRetry != null)
           Padding(
             padding: const EdgeInsets.only(bottom: 10),
@@ -938,6 +999,32 @@ class MessageBubble extends StatelessWidget {
               : [avatar, const SizedBox(width: 8), Flexible(child: bubbleColumn)],
         ),
       ),
+    );
+  }
+}
+
+class _BubbleActionButton extends StatelessWidget {
+  const _BubbleActionButton({
+    required this.icon,
+    required this.tooltip,
+    required this.onPressed,
+  });
+
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return IconButton(
+      onPressed: onPressed,
+      tooltip: tooltip,
+      icon: Icon(icon, size: 15, color: theme.colorScheme.onSurfaceVariant),
+      padding: EdgeInsets.zero,
+      constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+      visualDensity: VisualDensity.compact,
+      splashRadius: 16,
     );
   }
 }
