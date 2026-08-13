@@ -5,6 +5,8 @@ import 'package:aida/services/ai_provider_controller.dart';
 import 'package:aida/services/ai_service.dart';
 import 'package:aida/services/auth_service.dart';
 import 'package:aida/services/chat_repository.dart';
+import 'package:aida/models/user_profile.dart';
+import 'package:aida/services/profile_repository.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -18,6 +20,7 @@ void main() {
         ),
         chatRepository: _FakeRepository(),
         authService: _FakeAuthService(),
+        profileRepository: _FakeProfileRepository(),
       ),
     );
     await tester.pumpAndSettle();
@@ -44,6 +47,7 @@ void main() {
         ),
         chatRepository: _FakeRepository(),
         authService: _FakeAuthService(),
+        profileRepository: _FakeProfileRepository(),
       ),
     );
     await tester.pumpAndSettle();
@@ -123,4 +127,20 @@ class _FakeAuthService implements AuthService {
 
   @override
   Future<void> signOut() async {}
+}
+
+class _FakeProfileRepository implements ProfileRepository {
+  @override
+  Future<UserProfile?> fetchProfile(String userId) async => UserProfile(
+        id: userId,
+        displayName: 'Test User',
+        gender: Gender.male,
+      );
+
+  @override
+  Future<void> saveProfile({
+    required String userId,
+    required String displayName,
+    required Gender gender,
+  }) async {}
 }

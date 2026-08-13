@@ -5,11 +5,14 @@ import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:uuid/uuid.dart';
 
 import '../models/chat_message.dart';
+import '../models/user_profile.dart';
 import '../services/ai_provider_controller.dart';
 import '../services/ai_service.dart';
 import '../services/auth_service.dart';
 import '../services/chat_repository.dart';
+import '../services/profile_repository.dart';
 import 'chat_history_page.dart';
+import 'onboarding_page.dart';
 
 const _uuid = Uuid();
 
@@ -24,11 +27,15 @@ class ChatPage extends StatefulWidget {
     required this.aiProviderController,
     required this.chatRepository,
     required this.authService,
+    required this.profileRepository,
+    required this.profile,
   });
 
   final AiProviderController aiProviderController;
   final MessageRepository chatRepository;
   final AuthService authService;
+  final ProfileRepository profileRepository;
+  final UserProfile profile;
 
   @override
   State<ChatPage> createState() => _ChatPageState();
@@ -42,6 +49,7 @@ class _ChatPageState extends State<ChatPage> {
   String? _conversationId;
   bool _isLoading = false;
   bool _isInitializing = true;
+  late UserProfile _profile = widget.profile;
 
   @override
   void initState() {
@@ -135,6 +143,23 @@ class _ChatPageState extends State<ChatPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Could not sign out. Please try again.')),
       );
+    }
+  }
+
+  Future<void> _editProfile() async {
+    final updated = await Navigator.of(context).push<UserProfile>(
+      MaterialPageRoute(
+        builder: (context) => OnboardingPage(
+          userId: _profile.id,
+          profileRepository: widget.profileRepository,
+          initialProfile: _profile,
+          onComplete: (profile) => Navigator.of(context).pop(profile),
+        ),
+      ),
+    );
+
+    if (updated != null && mounted) {
+      setState(() => _profile = updated);
     }
   }
 
@@ -285,6 +310,12 @@ class _ChatPageState extends State<ChatPage> {
         centerTitle: true,
         actions: [
           _ProviderMenuButton(controller: widget.aiProviderController),
+          IconButton(
+            key: const Key('editProfileButton'),
+            onPressed: _editProfile,
+            tooltip: 'Edit profile',
+            icon: const Icon(Icons.person_outline),
+          ),
           IconButton(
             key: const Key('historyButton'),
             onPressed: _isInitializing ? null : _openHistory,
