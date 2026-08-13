@@ -258,8 +258,7 @@ class _ChatPageState extends State<ChatPage> {
     setState(() => _isLoading = true);
 
     try {
-      final reply = await widget.aiProviderController.activeService
-          .generateReply(text);
+      final reply = await widget.aiProviderController.generateReply(text);
 
       if (!mounted) return;
       setState(() {
