@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 
 /// Branded flash shown while the app initializes.
-class SplashScreen extends StatefulWidget {
+class SplashScreen extends StatelessWidget {
   const SplashScreen({super.key, required this.status});
 
   /// Human-readable init stage, updated live by `main()` while this screen
@@ -12,10 +12,38 @@ class SplashScreen extends StatefulWidget {
   final ValueListenable<String> status;
 
   @override
-  State<SplashScreen> createState() => _SplashScreenState();
+  Widget build(BuildContext context) {
+    final brightness = MediaQuery.platformBrightnessOf(context);
+    final isDark = brightness == Brightness.dark;
+
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      theme: isDark ? AppTheme.dark() : AppTheme.light(),
+      home: Scaffold(
+        body: ValueListenableBuilder<String>(
+          valueListenable: status,
+          builder: (context, value, _) => SplashBody(status: value),
+        ),
+      ),
+    );
+  }
 }
 
-class _SplashScreenState extends State<SplashScreen>
+/// The branded logo + progress indicator, reusable as both the app's initial
+/// splash and as the loading screen shown while later async work (e.g.
+/// fetching the user's profile) is in flight.
+class SplashBody extends StatefulWidget {
+  const SplashBody({super.key, this.status});
+
+  /// Optional status line shown under the progress bar. Omit to show just
+  /// the logo and progress bar.
+  final String? status;
+
+  @override
+  State<SplashBody> createState() => _SplashBodyState();
+}
+
+class _SplashBodyState extends State<SplashBody>
     with SingleTickerProviderStateMixin {
   late final _controller = AnimationController(
     vsync: this,
@@ -46,50 +74,45 @@ class _SplashScreenState extends State<SplashScreen>
         ? Colors.white.withValues(alpha: 0.12)
         : AidaColors.navy.withValues(alpha: 0.1);
 
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      theme: isDark ? AppTheme.dark : AppTheme.light,
-      home: Scaffold(
-        backgroundColor: backgroundColor,
-        body: Center(
-          child: FadeTransition(
-            opacity: _opacity,
-            child: ScaleTransition(
-              scale: _scale,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Image.asset(
-                    'lib/assets/aida-logo.png',
-                    width: 220,
-                    height: 220,
-                  ),
-                  const SizedBox(height: 28),
-                  SizedBox(
-                    width: 160,
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(4),
-                      child: LinearProgressIndicator(
-                        minHeight: 4,
-                        backgroundColor: trackColor,
-                        valueColor: const AlwaysStoppedAnimation(AidaColors.pink),
-                      ),
+    return ColoredBox(
+      color: backgroundColor,
+      child: Center(
+        child: FadeTransition(
+          opacity: _opacity,
+          child: ScaleTransition(
+            scale: _scale,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Image.asset(
+                  'lib/assets/aida-logo.png',
+                  width: 220,
+                  height: 220,
+                ),
+                const SizedBox(height: 28),
+                SizedBox(
+                  width: 160,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: LinearProgressIndicator(
+                      minHeight: 4,
+                      backgroundColor: trackColor,
+                      valueColor: const AlwaysStoppedAnimation(AidaColors.pink),
                     ),
                   ),
+                ),
+                if (widget.status != null) ...[
                   const SizedBox(height: 14),
-                  ValueListenableBuilder<String>(
-                    valueListenable: widget.status,
-                    builder: (context, status, _) => Text(
-                      status,
-                      style: TextStyle(
-                        color: statusColor,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w500,
-                      ),
+                  Text(
+                    widget.status!,
+                    style: TextStyle(
+                      color: statusColor,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
                     ),
                   ),
                 ],
-              ),
+              ],
             ),
           ),
         ),

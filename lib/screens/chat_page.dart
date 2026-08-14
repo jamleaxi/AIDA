@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:intl/intl.dart';
 import 'package:share_plus/share_plus.dart';
@@ -45,6 +44,50 @@ extension _ProviderIcon on AiProvider {
   Color get menuIconColor => switch (this) {
     AiProvider.gemini => const Color(0xFF8B5CF6),
     AiProvider.groq => const Color(0xFFF97316),
+  };
+}
+
+/// Options offered by the "Theme color" menu: `auto` follows the profile's
+/// gender, the rest manually override it.
+enum _ThemeColorChoice {
+  auto,
+  pink,
+  blue,
+  rainbow;
+
+  static _ThemeColorChoice fromGender(Gender? gender) => switch (gender) {
+    Gender.female => pink,
+    Gender.male => blue,
+    Gender.lgbtq => rainbow,
+    null => auto,
+  };
+
+  Gender? get gender => switch (this) {
+    auto => null,
+    pink => Gender.female,
+    blue => Gender.male,
+    rainbow => Gender.lgbtq,
+  };
+
+  String get label => switch (this) {
+    auto => 'Auto (match gender)',
+    pink => 'Pink',
+    blue => 'Blue',
+    rainbow => 'Rainbow',
+  };
+
+  IconData get icon => switch (this) {
+    auto => Icons.auto_awesome,
+    pink => Icons.favorite,
+    blue => Icons.water_drop,
+    rainbow => Icons.gradient,
+  };
+
+  Color get previewColor => switch (this) {
+    auto => AidaColors.navy,
+    pink => AidaColors.pink,
+    blue => AidaColors.blue,
+    rainbow => AidaColors.rainbowPurple,
   };
 }
 
@@ -215,6 +258,7 @@ class _ChatPageState extends State<ChatPage> {
 
     if (updated != null && mounted) {
       setState(() => _profile = updated);
+      widget.themeController.setGender(updated.gender);
     }
   }
 
@@ -237,16 +281,28 @@ class _ChatPageState extends State<ChatPage> {
     showAboutDialog(
       context: context,
       applicationName: 'AIDA',
-      applicationVersion: '1.0.0',
+      applicationVersion: 'Version 1.0',
       applicationIcon: ClipOval(
-        child: Image.asset(_botAvatarAsset, width: 48, height: 48, fit: BoxFit.cover),
+        child: Image.asset(
+          _botAvatarAsset,
+          width: 48,
+          height: 48,
+          fit: BoxFit.cover,
+        ),
       ),
       children: const [
         Padding(
           padding: EdgeInsets.only(top: 8),
           child: Text(
             'AIDA is your AI Digital Assistant, here to chat and help '
-            'with whatever is on your mind.',
+            'with whatever is on your mind.'
+            '\n\n'
+            'This AI-powered mobile app was developed by '
+            'Jamaica Lea Gicana-Elemento '
+            'as an academic requirement for the course of MITS006 Mobile Programming '
+            'at the University of the Immaculate Conception. '
+            '\n\n'
+            'Submitted to Prof. Clyde Chester Balaman.',
           ),
         ),
       ],
@@ -424,8 +480,9 @@ class _ChatPageState extends State<ChatPage> {
                           showTimestamp:
                               widget.chatPreferencesController.showTimestamps,
                           showName: widget.chatPreferencesController.showNames,
-                          showActions:
-                              widget.chatPreferencesController.showBubbleActions,
+                          showActions: widget
+                              .chatPreferencesController
+                              .showBubbleActions,
                           onRetry: message.isError && !_isLoading
                               ? () => _retryMessage(index)
                               : null,
@@ -498,7 +555,7 @@ class _ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
   @override
   Size get preferredSize => const Size.fromHeight(108);
 
-  void _handleMenuSelection(String action) {
+  void _handleMenuSelection(BuildContext context, String action) {
     switch (action) {
       case 'provider_gemini':
         aiProviderController.select(AiProvider.gemini);
@@ -510,6 +567,8 @@ class _ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
         onChangeName();
       case 'change_gender':
         onChangeGender();
+      case 'theme_color':
+        _pickThemeColor(context);
       case 'toggle_theme':
         themeController.setDark(!themeController.isDark);
       case 'toggle_timestamps':
@@ -531,18 +590,51 @@ class _ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
     }
   }
 
+  Future<void> _pickThemeColor(BuildContext context) async {
+    final current = _ThemeColorChoice.fromGender(
+      themeController.accentOverride,
+    );
+    final selected = await showDialog<_ThemeColorChoice>(
+      context: context,
+      builder: (context) => SimpleDialog(
+        title: const Text('Theme color'),
+        children: [
+          for (final choice in _ThemeColorChoice.values)
+            ListTile(
+              onTap: () => Navigator.of(context).pop(choice),
+              leading: _MenuIconBadge(
+                icon: choice.icon,
+                color: choice.previewColor,
+              ),
+              title: Text(choice.label),
+              trailing: choice == current
+                  ? const Icon(Icons.check, size: 18)
+                  : null,
+            ),
+        ],
+      ),
+    );
+
+    if (selected != null) {
+      themeController.setAccentOverride(selected.gender);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDown = aiProviderController.allProvidersDown;
 
     return Container(
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [AidaColors.pink, AidaColors.pinkDeep],
+          colors: GenderTheme.appBarGradient(
+            themeController.effectiveAccent,
+            isDark: Theme.of(context).brightness == Brightness.dark,
+          ),
         ),
-        borderRadius: BorderRadius.only(
+        borderRadius: const BorderRadius.only(
           bottomLeft: Radius.circular(24),
           bottomRight: Radius.circular(24),
         ),
@@ -587,7 +679,9 @@ class _ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
                           height: 8,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
-                            color: isDown ? Colors.grey.shade400 : Colors.greenAccent,
+                            color: isDown
+                                ? Colors.grey.shade400
+                                : Colors.greenAccent,
                           ),
                         ),
                         const SizedBox(width: 6),
@@ -612,13 +706,17 @@ class _ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
                 key: const Key('clearChatButton'),
                 onPressed: isInitializing ? null : onNewChat,
                 tooltip: 'New chat',
-                icon: const Icon(Icons.edit_square, color: Colors.white, size: 20),
+                icon: const Icon(
+                  Icons.edit_square,
+                  color: Colors.white,
+                  size: 20,
+                ),
               ),
               PopupMenuButton<String>(
                 key: const Key('chatMenuButton'),
                 tooltip: 'Menu',
                 icon: const Icon(Icons.more_vert, color: Colors.white),
-                onSelected: _handleMenuSelection,
+                onSelected: (value) => _handleMenuSelection(context, value),
                 itemBuilder: (context) {
                   final available = aiProviderController.availableProviders;
                   final current = aiProviderController.current;
@@ -684,6 +782,20 @@ class _ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
                     ),
                     const PopupMenuDivider(),
                     PopupMenuItem<String>(
+                      value: 'theme_color',
+                      key: const Key('themeColorMenuItem'),
+                      child: const Row(
+                        children: [
+                          _MenuIconBadge(
+                            icon: Icons.palette_outlined,
+                            color: AidaColors.pink,
+                          ),
+                          SizedBox(width: 12),
+                          Text('Theme color'),
+                        ],
+                      ),
+                    ),
+                    PopupMenuItem<String>(
                       value: 'toggle_theme',
                       key: const Key('toggleThemeMenuItem'),
                       child: Row(
@@ -721,7 +833,9 @@ class _ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
                             value: chatPreferencesController.showTimestamps,
                             onChanged: (value) {
                               Navigator.of(context).pop();
-                              chatPreferencesController.setShowTimestamps(value);
+                              chatPreferencesController.setShowTimestamps(
+                                value,
+                              );
                             },
                           ),
                         ],
@@ -758,7 +872,7 @@ class _ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
                             color: Color(0xFF10B981),
                           ),
                           const SizedBox(width: 12),
-                          const Expanded(child: Text('Show copy/forward')),
+                          const Expanded(child: Text('Show share button')),
                           Switch(
                             value: chatPreferencesController.showBubbleActions,
                             onChanged: (value) {
@@ -799,7 +913,9 @@ class _ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
                           const SizedBox(width: 12),
                           Text(
                             'Sign out',
-                            style: TextStyle(color: Theme.of(context).colorScheme.error),
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.error,
+                            ),
                           ),
                         ],
                       ),
@@ -835,14 +951,7 @@ class MessageBubble extends StatelessWidget {
   final bool showActions;
   final VoidCallback? onRetry;
 
-  void _copyMessage(BuildContext context) {
-    Clipboard.setData(ClipboardData(text: message.text));
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Copied to clipboard'), duration: Duration(seconds: 1)),
-    );
-  }
-
-  void _forwardMessage() {
+  void _shareMessage() {
     SharePlus.instance.share(ShareParams(text: message.text));
   }
 
@@ -853,7 +962,7 @@ class MessageBubble extends StatelessWidget {
     final color = message.isError
         ? theme.colorScheme.errorContainer
         : message.isUser
-        ? AidaColors.pink.withValues(alpha: isDark ? 0.35 : 0.16)
+        ? theme.colorScheme.primary.withValues(alpha: isDark ? 0.35 : 0.16)
         : AidaColors.teal.withValues(alpha: isDark ? 0.28 : 0.16);
     final textStyle = theme.textTheme.bodyMedium?.copyWith(
       color: message.isError
@@ -870,135 +979,208 @@ class MessageBubble extends StatelessWidget {
       ),
     );
 
-    final bubbleColumn = Column(
-      crossAxisAlignment: message.isUser
-          ? CrossAxisAlignment.end
-          : CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        if (showName)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 4, left: 2, right: 2),
-            child: Text(
-              message.isUser ? userName : 'AIDA',
-              style: theme.textTheme.labelSmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-                fontWeight: FontWeight.w600,
+    // Kept out of the bubble column so the avatar can align with the top of
+    // the bubble itself, regardless of whether a name label is shown above it.
+    final nameLabel = showName
+        ? Text(
+            message.isUser ? userName : 'AIDA',
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+              fontWeight: FontWeight.w600,
+            ),
+          )
+        : null;
+
+    // Only the bubble itself goes in the core row, so the row's height is the
+    // bubble's height — that is what the avatar tops out against and what the
+    // share button centres on. The name, timestamp and retry sit outside it.
+    final bubble = Container(
+      key: const Key('messageBubbleBody'),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.only(
+          topLeft: const Radius.circular(16),
+          topRight: const Radius.circular(16),
+          bottomLeft: Radius.circular(message.isUser ? 16 : 4),
+          bottomRight: Radius.circular(message.isUser ? 4 : 16),
+        ),
+      ),
+      child: message.isUser
+          ? Text(message.text, style: textStyle)
+          : MarkdownBody(
+              data: message.text,
+              selectable: true,
+              softLineBreak: true,
+              imageBuilder: (uri, title, alt) => Text(
+                alt?.isNotEmpty == true ? alt! : 'Image',
+                style: textStyle?.copyWith(fontStyle: FontStyle.italic),
               ),
-            ),
-          ),
-        Container(
-          margin: const EdgeInsets.only(bottom: 4),
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-          decoration: BoxDecoration(
-            color: color,
-            borderRadius: BorderRadius.only(
-              topLeft: const Radius.circular(16),
-              topRight: const Radius.circular(16),
-              bottomLeft: Radius.circular(message.isUser ? 16 : 4),
-              bottomRight: Radius.circular(message.isUser ? 4 : 16),
-            ),
-          ),
-          child: message.isUser
-              ? Text(message.text, style: textStyle)
-              : MarkdownBody(
-                  data: message.text,
-                  selectable: true,
-                  softLineBreak: true,
-                  imageBuilder: (uri, title, alt) => Text(
-                    alt?.isNotEmpty == true ? alt! : 'Image',
-                    style: textStyle?.copyWith(fontStyle: FontStyle.italic),
-                  ),
-                  styleSheet: MarkdownStyleSheet.fromTheme(theme).copyWith(
-                    p: textStyle,
-                    pPadding: EdgeInsets.zero,
-                    strong: textStyle?.copyWith(fontWeight: FontWeight.bold),
-                    em: textStyle?.copyWith(fontStyle: FontStyle.italic),
-                    blockSpacing: 10,
-                    listIndent: 20,
-                    code: theme.textTheme.bodySmall?.copyWith(
-                      fontFamily: 'monospace',
-                      color: theme.colorScheme.onSurfaceVariant,
-                      backgroundColor: theme.colorScheme.surfaceContainer,
-                    ),
-                    codeblockPadding: const EdgeInsets.all(10),
-                    codeblockDecoration: BoxDecoration(
-                      color: theme.colorScheme.surfaceContainer,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    blockquotePadding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 6,
-                    ),
-                    blockquoteDecoration: BoxDecoration(
-                      color: theme.colorScheme.surfaceContainer,
-                      border: Border(
-                        left: BorderSide(color: theme.colorScheme.primary, width: 3),
-                      ),
+              styleSheet: MarkdownStyleSheet.fromTheme(theme).copyWith(
+                p: textStyle,
+                pPadding: EdgeInsets.zero,
+                strong: textStyle?.copyWith(fontWeight: FontWeight.bold),
+                em: textStyle?.copyWith(fontStyle: FontStyle.italic),
+                blockSpacing: 10,
+                listIndent: 20,
+                code: theme.textTheme.bodySmall?.copyWith(
+                  fontFamily: 'monospace',
+                  color: theme.colorScheme.onSurfaceVariant,
+                  backgroundColor: theme.colorScheme.surfaceContainer,
+                ),
+                codeblockPadding: const EdgeInsets.all(10),
+                codeblockDecoration: BoxDecoration(
+                  color: theme.colorScheme.surfaceContainer,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                blockquotePadding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 6,
+                ),
+                blockquoteDecoration: BoxDecoration(
+                  color: theme.colorScheme.surfaceContainer,
+                  border: Border(
+                    left: BorderSide(
+                      color: theme.colorScheme.primary,
+                      width: 3,
                     ),
                   ),
                 ),
-        ),
-        if (showTimestamp && message.createdAt != null)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 4, left: 2, right: 2),
-            child: Text(
-              _timestampFormat.format(message.createdAt!.toPhilippineTime),
-              style: theme.textTheme.labelSmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
-                fontSize: 10,
               ),
             ),
-          ),
-        if (showActions && !message.isError)
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _BubbleActionButton(
-                icon: Icons.copy_rounded,
-                tooltip: 'Copy',
-                onPressed: () => _copyMessage(context),
-              ),
-              const SizedBox(width: 2),
-              _BubbleActionButton(
-                icon: Icons.forward_rounded,
-                tooltip: 'Forward',
-                onPressed: _forwardMessage,
-              ),
-            ],
-          ),
-        if (message.isError && onRetry != null)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 10),
-            child: TextButton.icon(
-              onPressed: onRetry,
-              style: TextButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 8),
-                minimumSize: Size.zero,
-                visualDensity: VisualDensity.compact,
-              ),
-              icon: const Icon(Icons.refresh, size: 16),
-              label: const Text('Retry'),
-            ),
-          ),
-      ],
     );
 
-    return Align(
-      alignment: message.isUser ? Alignment.centerRight : Alignment.centerLeft,
-      child: FractionallySizedBox(
-        widthFactor: 0.86,
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.end,
-          mainAxisAlignment: message.isUser
-              ? MainAxisAlignment.end
-              : MainAxisAlignment.start,
-          children: message.isUser
-              ? [Flexible(child: bubbleColumn), const SizedBox(width: 8), avatar]
-              : [avatar, const SizedBox(width: 8), Flexible(child: bubbleColumn)],
-        ),
+    final timestampLabel = showTimestamp && message.createdAt != null
+        ? Text(
+            _timestampFormat.format(message.createdAt!.toPhilippineTime),
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
+              fontSize: 10,
+            ),
+          )
+        : null;
+
+    final retryButton = message.isError && onRetry != null
+        ? TextButton.icon(
+            onPressed: onRetry,
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              minimumSize: Size.zero,
+              visualDensity: VisualDensity.compact,
+            ),
+            icon: const Icon(Icons.refresh, size: 16),
+            label: const Text('Retry'),
+          )
+        : null;
+
+    final shareButton = showActions && !message.isError
+        ? _BubbleActionButton(
+            icon: Icons.share_rounded,
+            tooltip: 'Share',
+            onPressed: _shareMessage,
+          )
+        : null;
+
+    // The avatar occupies the outer slot on its own side; the share button
+    // occupies the mirrored slot on the other side. Because both slots are the
+    // same fixed width and pinned to the row's edges, AIDA's share button lands
+    // in exactly the column where the user's avatar sits, and vice versa.
+    // The avatar is pinned to the top of the bubble, the share button centered
+    // against the bubble's height.
+    final avatarSlot = _BubbleSideSlot(
+      alignment: Alignment.topCenter,
+      child: avatar,
+    );
+    final shareSlot = shareButton == null
+        ? null
+        : _BubbleSideSlot(alignment: Alignment.center, child: shareButton);
+
+    final bubbleSlot = Expanded(
+      child: Align(
+        alignment: message.isUser ? Alignment.topRight : Alignment.topLeft,
+        child: bubble,
       ),
+    );
+
+    // Everything outside the bubble is inset by the avatar's slot so it lines
+    // up with the bubble's edge rather than the avatar's.
+    final asideInset = EdgeInsets.only(
+      left: message.isUser ? 2 : _bubbleSideSlotWidth + _bubbleSideGap,
+      right: message.isUser ? _bubbleSideSlotWidth + _bubbleSideGap : 2,
+    );
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Column(
+        crossAxisAlignment: message.isUser
+            ? CrossAxisAlignment.end
+            : CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (nameLabel != null)
+            Padding(
+              padding: asideInset.add(const EdgeInsets.only(bottom: 4)),
+              child: nameLabel,
+            ),
+          // IntrinsicHeight bounds the row's height to the bubble's, which is
+          // what lets the side slots stretch and align against it.
+          IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: message.isUser
+                  ? [
+                      if (shareSlot != null) ...[
+                        shareSlot,
+                        const SizedBox(width: _bubbleSideGap),
+                      ],
+                      bubbleSlot,
+                      const SizedBox(width: _bubbleSideGap),
+                      avatarSlot,
+                    ]
+                  : [
+                      avatarSlot,
+                      const SizedBox(width: _bubbleSideGap),
+                      bubbleSlot,
+                      if (shareSlot != null) ...[
+                        const SizedBox(width: _bubbleSideGap),
+                        shareSlot,
+                      ],
+                    ],
+            ),
+          ),
+          if (timestampLabel != null)
+            Padding(
+              padding: asideInset.add(const EdgeInsets.only(top: 4)),
+              child: timestampLabel,
+            ),
+          if (retryButton != null)
+            Padding(
+              padding: asideInset.add(const EdgeInsets.only(top: 4)),
+              child: retryButton,
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+const _bubbleSideSlotWidth = 32.0;
+const _bubbleSideGap = 8.0;
+
+/// A fixed-width column beside a chat bubble holding either the avatar or the
+/// share button. Stretches to the bubble's height so [alignment] can position
+/// its child against the bubble.
+class _BubbleSideSlot extends StatelessWidget {
+  const _BubbleSideSlot({required this.alignment, required this.child});
+
+  final Alignment alignment;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: _bubbleSideSlotWidth,
+      child: Align(alignment: alignment, child: child),
     );
   }
 }
@@ -1083,7 +1265,10 @@ class _MessageComposer extends StatelessWidget {
                 key: const Key('sendButton'),
                 onPressed: isLoading ? null : onSend,
                 tooltip: 'Send message',
-                icon: const Icon(Icons.send_rounded, color: AidaColors.pink),
+                icon: Icon(
+                  Icons.send_rounded,
+                  color: theme.colorScheme.primary,
+                ),
               ),
             ),
           ],

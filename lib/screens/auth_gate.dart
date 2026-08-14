@@ -10,6 +10,7 @@ import '../services/theme_controller.dart';
 import 'auth_page.dart';
 import 'chat_page.dart';
 import 'onboarding_page.dart';
+import 'splash_screen.dart';
 
 class AuthGate extends StatelessWidget {
   const AuthGate({
@@ -85,10 +86,16 @@ class _ProfileGateState extends State<_ProfileGate> {
   @override
   void initState() {
     super.initState();
-    _profileFuture = widget.profileRepository.fetchProfile(widget.userId);
+    _profileFuture = widget.profileRepository.fetchProfile(widget.userId).then((
+      profile,
+    ) {
+      if (profile != null) widget.themeController.setGender(profile.gender);
+      return profile;
+    });
   }
 
   void _onOnboardingComplete(UserProfile profile) {
+    widget.themeController.setGender(profile.gender);
     setState(() {
       _profileFuture = Future.value(profile);
     });
@@ -100,9 +107,7 @@ class _ProfileGateState extends State<_ProfileGate> {
       future: _profileFuture,
       builder: (context, snapshot) {
         if (snapshot.connectionState != ConnectionState.done) {
-          return const Scaffold(
-            body: Center(child: CircularProgressIndicator()),
-          );
+          return const Scaffold(body: SplashBody());
         }
 
         final profile = snapshot.data;

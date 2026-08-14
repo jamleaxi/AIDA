@@ -150,8 +150,8 @@ class _AidaAppState extends State<AidaApp> {
         return MaterialApp(
           title: 'AIDA',
           debugShowCheckedModeBanner: false,
-          theme: AppTheme.light,
-          darkTheme: AppTheme.dark,
+          theme: AppTheme.light(widget.themeController.effectiveAccent),
+          darkTheme: AppTheme.dark(widget.themeController.effectiveAccent),
           themeMode: widget.themeController.mode,
           home: AuthGate(
             authService: widget.authService,
