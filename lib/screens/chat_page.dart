@@ -91,6 +91,36 @@ enum _ThemeColorChoice {
   };
 }
 
+/// Options offered by the "Text size" menu, applied as a scale factor to all
+/// text within the message list.
+enum _TextSizeChoice {
+  small,
+  medium,
+  large,
+  extraLarge;
+
+  static _TextSizeChoice fromScale(double scale) {
+    if (scale <= small.scale) return small;
+    if (scale >= extraLarge.scale) return extraLarge;
+    if (scale >= large.scale) return large;
+    return medium;
+  }
+
+  double get scale => switch (this) {
+    small => 0.85,
+    medium => 1.0,
+    large => 1.15,
+    extraLarge => 1.3,
+  };
+
+  String get label => switch (this) {
+    small => 'Small',
+    medium => 'Default',
+    large => 'Large',
+    extraLarge => 'Extra large',
+  };
+}
+
 class ChatPage extends StatefulWidget {
   const ChatPage({
     super.key,
@@ -314,11 +344,15 @@ class _ChatPageState extends State<ChatPage> {
     final conversationId = _conversationId;
     if (text.isEmpty || _isLoading || conversationId == null) return;
 
+    final userMessage = ChatMessage(
+      text: text,
+      isUser: true,
+      createdAt: DateTime.now(),
+      status: MessageStatus.sending,
+    );
+
     setState(() {
-      _messages = [
-        ..._messages,
-        ChatMessage(text: text, isUser: true, createdAt: DateTime.now()),
-      ];
+      _messages = [..._messages, userMessage];
       _controller.clear();
     });
     _scrollToBottom();
@@ -330,7 +364,12 @@ class _ChatPageState extends State<ChatPage> {
       sender: 'user',
       content: text,
     );
-    unawaited(saveUserMessage);
+    unawaited(
+      saveUserMessage.then((saved) {
+        userMessage.status = saved ? MessageStatus.sent : MessageStatus.failed;
+        if (mounted) setState(() {});
+      }),
+    );
 
     await _requestReply(
       text: text,
@@ -358,7 +397,7 @@ class _ChatPageState extends State<ChatPage> {
   Future<void> _requestReply({
     required String text,
     required String conversationId,
-    Future<void>? pendingUserSave,
+    Future<bool>? pendingUserSave,
   }) async {
     setState(() => _isLoading = true);
 
@@ -417,7 +456,7 @@ class _ChatPageState extends State<ChatPage> {
     }
   }
 
-  Future<void> _saveMessage({
+  Future<bool> _saveMessage({
     required String conversationId,
     required String sender,
     required String content,
@@ -428,9 +467,11 @@ class _ChatPageState extends State<ChatPage> {
         sender: sender,
         content: content,
       );
+      return true;
     } catch (error, stackTrace) {
       // Saving history should not prevent the user from receiving an AI reply.
       debugPrint('Could not save $sender message: $error\n$stackTrace');
+      return false;
     }
   }
 
@@ -466,28 +507,36 @@ class _ChatPageState extends State<ChatPage> {
             : Column(
                 children: [
                   Expanded(
-                    child: ListView.builder(
-                      key: const Key('messageList'),
-                      controller: _scrollController,
-                      padding: const EdgeInsets.all(16),
-                      itemCount: _messages.length,
-                      itemBuilder: (context, index) {
-                        final message = _messages[index];
-                        return MessageBubble(
-                          message: message,
-                          userGender: _profile.gender,
-                          userName: _profile.displayName,
-                          showTimestamp:
-                              widget.chatPreferencesController.showTimestamps,
-                          showName: widget.chatPreferencesController.showNames,
-                          showActions: widget
-                              .chatPreferencesController
-                              .showBubbleActions,
-                          onRetry: message.isError && !_isLoading
-                              ? () => _retryMessage(index)
-                              : null,
-                        );
-                      },
+                    child: MediaQuery(
+                      data: MediaQuery.of(context).copyWith(
+                        textScaler: TextScaler.linear(
+                          widget.chatPreferencesController.textScale,
+                        ),
+                      ),
+                      child: ListView.builder(
+                        key: const Key('messageList'),
+                        controller: _scrollController,
+                        padding: const EdgeInsets.all(16),
+                        itemCount: _messages.length,
+                        itemBuilder: (context, index) {
+                          final message = _messages[index];
+                          return MessageBubble(
+                            message: message,
+                            userGender: _profile.gender,
+                            userName: _profile.displayName,
+                            showTimestamp:
+                                widget.chatPreferencesController.showTimestamps,
+                            showName:
+                                widget.chatPreferencesController.showNames,
+                            showActions: widget
+                                .chatPreferencesController
+                                .showBubbleActions,
+                            onRetry: message.isError && !_isLoading
+                                ? () => _retryMessage(index)
+                                : null,
+                          );
+                        },
+                      ),
                     ),
                   ),
                   if (_isLoading)
@@ -569,6 +618,8 @@ class _ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
         onChangeGender();
       case 'theme_color':
         _pickThemeColor(context);
+      case 'text_size':
+        _pickTextSize(context);
       case 'toggle_theme':
         themeController.setDark(!themeController.isDark);
       case 'toggle_timestamps':
@@ -617,6 +668,43 @@ class _ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
 
     if (selected != null) {
       themeController.setAccentOverride(selected.gender);
+    }
+  }
+
+  Future<void> _pickTextSize(BuildContext context) async {
+    final current = _TextSizeChoice.fromScale(
+      chatPreferencesController.textScale,
+    );
+    final selected = await showDialog<_TextSizeChoice>(
+      context: context,
+      builder: (context) => SimpleDialog(
+        title: const Text('Text size'),
+        children: [
+          for (final choice in _TextSizeChoice.values)
+            ListTile(
+              onTap: () => Navigator.of(context).pop(choice),
+              leading: SizedBox(
+                width: 30,
+                child: Text(
+                  'Aa',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 13 + 6 * choice.scale,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              title: Text(choice.label),
+              trailing: choice == current
+                  ? const Icon(Icons.check, size: 18)
+                  : null,
+            ),
+        ],
+      ),
+    );
+
+    if (selected != null) {
+      chatPreferencesController.setTextScale(selected.scale);
     }
   }
 
@@ -792,6 +880,20 @@ class _ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
                           ),
                           SizedBox(width: 12),
                           Text('Theme color'),
+                        ],
+                      ),
+                    ),
+                    PopupMenuItem<String>(
+                      value: 'text_size',
+                      key: const Key('textSizeMenuItem'),
+                      child: const Row(
+                        children: [
+                          _MenuIconBadge(
+                            icon: Icons.text_fields,
+                            color: Color(0xFF3B82F6),
+                          ),
+                          SizedBox(width: 12),
+                          Text('Text size'),
                         ],
                       ),
                     ),
@@ -1060,6 +1162,22 @@ class MessageBubble extends StatelessWidget {
           )
         : null;
 
+    final statusIcon = message.isUser && message.status != null
+        ? _MessageStatusIcon(status: message.status!)
+        : null;
+
+    final footer = timestampLabel == null && statusIcon == null
+        ? null
+        : Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ?timestampLabel,
+              if (timestampLabel != null && statusIcon != null)
+                const SizedBox(width: 4),
+              ?statusIcon,
+            ],
+          );
+
     final retryButton = message.isError && onRetry != null
         ? TextButton.icon(
             onPressed: onRetry,
@@ -1148,10 +1266,10 @@ class MessageBubble extends StatelessWidget {
                     ],
             ),
           ),
-          if (timestampLabel != null)
+          if (footer != null)
             Padding(
               padding: asideInset.add(const EdgeInsets.only(top: 4)),
-              child: timestampLabel,
+              child: footer,
             ),
           if (retryButton != null)
             Padding(
@@ -1166,6 +1284,46 @@ class MessageBubble extends StatelessWidget {
 
 const _bubbleSideSlotWidth = 32.0;
 const _bubbleSideGap = 8.0;
+
+/// Small delivery-status glyph shown beside a user message's timestamp:
+/// spinning while the save is in flight, a check once it lands, or a warning
+/// if it failed.
+class _MessageStatusIcon extends StatelessWidget {
+  const _MessageStatusIcon({required this.status});
+
+  final MessageStatus status;
+
+  @override
+  Widget build(BuildContext context) {
+    final mutedColor = Theme.of(
+      context,
+    ).colorScheme.onSurfaceVariant.withValues(alpha: 0.7);
+
+    return switch (status) {
+      MessageStatus.sending => SizedBox(
+        key: const Key('messageStatusSending'),
+        width: 10,
+        height: 10,
+        child: CircularProgressIndicator(strokeWidth: 1.5, color: mutedColor),
+      ),
+      MessageStatus.sent => Icon(
+        Icons.check_rounded,
+        key: const Key('messageStatusSent'),
+        size: 12,
+        color: mutedColor,
+      ),
+      MessageStatus.failed => Tooltip(
+        message: 'Not saved to history, but still shown in this chat',
+        child: Icon(
+          Icons.error_outline_rounded,
+          key: const Key('messageStatusFailed'),
+          size: 12,
+          color: Theme.of(context).colorScheme.error,
+        ),
+      ),
+    };
+  }
+}
 
 /// A fixed-width column beside a chat bubble holding either the avatar or the
 /// share button. Stretches to the bubble's height so [alignment] can position

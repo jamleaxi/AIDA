@@ -8,9 +8,9 @@ class AiProviderController extends ChangeNotifier {
   AiProviderController({
     required Map<AiProvider, AiService> services,
     required AiProvider initialProvider,
-  })  : _services = Map.unmodifiable(services),
-        _current = initialProvider,
-        _preferred = initialProvider {
+  }) : _services = Map.unmodifiable(services),
+       _current = initialProvider,
+       _preferred = initialProvider {
     assert(
       _services.containsKey(_current),
       'initialProvider must have a configured service',

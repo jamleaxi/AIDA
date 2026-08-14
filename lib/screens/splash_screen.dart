@@ -50,9 +50,10 @@ class _SplashBodyState extends State<SplashBody>
     duration: const Duration(milliseconds: 600),
   )..forward();
 
-  late final _scale = Tween<double>(begin: 0.85, end: 1).animate(
-    CurvedAnimation(parent: _controller, curve: Curves.easeOutBack),
-  );
+  late final _scale = Tween<double>(
+    begin: 0.85,
+    end: 1,
+  ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutBack));
   late final _opacity = CurvedAnimation(
     parent: _controller,
     curve: const Interval(0, 0.6, curve: Curves.easeOut),
@@ -69,7 +70,9 @@ class _SplashBodyState extends State<SplashBody>
     final brightness = MediaQuery.platformBrightnessOf(context);
     final isDark = brightness == Brightness.dark;
     final backgroundColor = isDark ? AidaColors.bgDark : AidaColors.bgLight;
-    final statusColor = isDark ? Colors.white70 : AidaColors.navy.withValues(alpha: 0.7);
+    final statusColor = isDark
+        ? Colors.white70
+        : AidaColors.navy.withValues(alpha: 0.7);
     final trackColor = isDark
         ? Colors.white.withValues(alpha: 0.12)
         : AidaColors.navy.withValues(alpha: 0.1);

@@ -61,11 +61,18 @@ Future<String?> _pump(
 }
 
 void main() {
-  testWidgets('shows an empty state with no saved chats', (tester) async {
+  testWidgets('shows an illustrated empty state with no saved chats', (
+    tester,
+  ) async {
     final repository = _FakeChatRepository();
     await _pump(tester, repository);
 
     expect(find.text('No saved chats yet.'), findsOneWidget);
+    expect(
+      find.text('Conversations you have with AIDA will show up here.'),
+      findsOneWidget,
+    );
+    expect(find.byIcon(Icons.forum_outlined), findsOneWidget);
   });
 
   testWidgets('shows an error state when loading fails', (tester) async {

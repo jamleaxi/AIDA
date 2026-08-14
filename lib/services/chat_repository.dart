@@ -45,16 +45,17 @@ class ChatRepository implements MessageRepository {
         .eq('conversation_id', conversationId)
         .order('created_at', ascending: true);
 
-    return (rows as List)
-        .map((row) => row as Map<String, dynamic>)
-        .map(
-          (row) => ChatMessage(
-            text: row['content'] as String? ?? '',
-            isUser: row['sender'] == 'user',
-            createdAt: _parseTimestamp(row['created_at']),
-          ),
-        )
-        .toList();
+    return (rows as List).map((row) => row as Map<String, dynamic>).map((row) {
+      final isUser = row['sender'] == 'user';
+      return ChatMessage(
+        text: row['content'] as String? ?? '',
+        isUser: isUser,
+        createdAt: _parseTimestamp(row['created_at']),
+        // Already persisted, by definition — shown the same way a
+        // successful send is.
+        status: isUser ? MessageStatus.sent : null,
+      );
+    }).toList();
   }
 
   @override

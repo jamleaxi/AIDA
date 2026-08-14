@@ -11,9 +11,9 @@ enum AiProvider {
   }
 
   String get label => switch (this) {
-        AiProvider.gemini => 'Gemini',
-        AiProvider.groq => 'Groq',
-      };
+    AiProvider.gemini => 'Gemini',
+    AiProvider.groq => 'Groq',
+  };
 }
 
 abstract interface class AiService {

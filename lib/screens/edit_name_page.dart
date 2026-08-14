@@ -59,9 +59,7 @@ class _EditNamePageState extends State<EditNamePage> {
     } catch (error, stackTrace) {
       debugPrint('Change name error: $error\n$stackTrace');
       if (!mounted) return;
-      setState(
-        () => _errorMessage = 'Something went wrong. Please try again.',
-      );
+      setState(() => _errorMessage = 'Something went wrong. Please try again.');
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }

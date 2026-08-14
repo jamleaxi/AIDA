@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:aida/models/chat_message.dart';
 import 'package:aida/services/chat_repository.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
@@ -110,8 +111,12 @@ void main() {
           messages[0].createdAt,
           DateTime.parse('2026-08-14T10:00:00.000Z'),
         );
+        // Already persisted, by definition, so it's shown as sent.
+        expect(messages[0].status, MessageStatus.sent);
         expect(messages[1].text, 'Hello!');
         expect(messages[1].isUser, isFalse);
+        // AIDA's own messages never carry a delivery-status indicator.
+        expect(messages[1].status, isNull);
       },
     );
 

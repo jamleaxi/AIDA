@@ -71,14 +71,16 @@ class _OnboardingPageState extends State<OnboardingPage> {
       );
       if (!mounted) return;
       widget.onComplete(
-        UserProfile(id: widget.userId, displayName: displayName, gender: gender),
+        UserProfile(
+          id: widget.userId,
+          displayName: displayName,
+          gender: gender,
+        ),
       );
     } catch (error, stackTrace) {
       debugPrint('Onboarding error: $error\n$stackTrace');
       if (!mounted) return;
-      setState(
-        () => _errorMessage = 'Something went wrong. Please try again.',
-      );
+      setState(() => _errorMessage = 'Something went wrong. Please try again.');
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }
@@ -170,9 +172,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
                           ? const SizedBox(
                               height: 18,
                               width: 18,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                              ),
+                              child: CircularProgressIndicator(strokeWidth: 2),
                             )
                           : Text(widget.isEditing ? 'Save' : 'Continue'),
                     ),

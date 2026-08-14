@@ -102,7 +102,9 @@ class _ChatHistoryPageState extends State<ChatHistoryPage> {
     await _exportConversations(selected);
   }
 
-  Future<void> _exportConversations(List<ConversationSummary> conversations) async {
+  Future<void> _exportConversations(
+    List<ConversationSummary> conversations,
+  ) async {
     if (conversations.isEmpty) return;
 
     setState(() => _isExporting = true);
@@ -140,7 +142,9 @@ class _ChatHistoryPageState extends State<ChatHistoryPage> {
 
       await SharePlus.instance.share(
         ShareParams(
-          files: [XFile.fromData(bytes, name: fileName, mimeType: 'text/plain')],
+          files: [
+            XFile.fromData(bytes, name: fileName, mimeType: 'text/plain'),
+          ],
           subject: 'AIDA chat export',
         ),
       );
@@ -170,7 +174,9 @@ class _ChatHistoryPageState extends State<ChatHistoryPage> {
   ) {
     final buffer = StringBuffer()
       ..writeln('AIDA Chat Export')
-      ..writeln('Generated ${_exportTimestampFormat.format(DateTime.now().toPhilippineTime)}')
+      ..writeln(
+        'Generated ${_exportTimestampFormat.format(DateTime.now().toPhilippineTime)}',
+      )
       ..writeln();
 
     for (final entry in entries) {
@@ -260,7 +266,7 @@ class _ChatHistoryPageState extends State<ChatHistoryPage> {
           final conversations = snapshot.data ?? const [];
           _conversations = conversations;
           if (conversations.isEmpty) {
-            return const Center(child: Text('No saved chats yet.'));
+            return const _EmptyChatsIllustration();
           }
 
           final dateFormat = DateFormat('MMM d, y · h:mm a');
@@ -305,7 +311,9 @@ class _ChatHistoryPageState extends State<ChatHistoryPage> {
                     : null,
                 onTap: _selectionMode
                     ? () => _toggleSelected(conversation.conversationId)
-                    : () => Navigator.of(context).pop(conversation.conversationId),
+                    : () => Navigator.of(
+                        context,
+                      ).pop(conversation.conversationId),
                 onLongPress: _selectionMode
                     ? null
                     : () {
@@ -318,6 +326,51 @@ class _ChatHistoryPageState extends State<ChatHistoryPage> {
             },
           );
         },
+      ),
+    );
+  }
+}
+
+/// Shown in place of the conversation list when the user has no saved
+/// chats yet.
+class _EmptyChatsIllustration extends StatelessWidget {
+  const _EmptyChatsIllustration();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 120,
+              height: 120,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: theme.colorScheme.primary.withValues(alpha: 0.12),
+              ),
+              child: Icon(
+                Icons.forum_outlined,
+                size: 56,
+                color: theme.colorScheme.primary,
+              ),
+            ),
+            const SizedBox(height: 20),
+            Text('No saved chats yet.', style: theme.textTheme.titleMedium),
+            const SizedBox(height: 8),
+            Text(
+              'Conversations you have with AIDA will show up here.',
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

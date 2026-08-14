@@ -53,9 +53,7 @@ class _EditGenderPageState extends State<EditGenderPage> {
     } catch (error, stackTrace) {
       debugPrint('Change gender error: $error\n$stackTrace');
       if (!mounted) return;
-      setState(
-        () => _errorMessage = 'Something went wrong. Please try again.',
-      );
+      setState(() => _errorMessage = 'Something went wrong. Please try again.');
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }

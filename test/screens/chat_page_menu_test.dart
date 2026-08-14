@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:aida/models/chat_message.dart';
 import 'package:aida/models/conversation_summary.dart';
 import 'package:aida/models/user_profile.dart';
@@ -21,12 +23,19 @@ class _FakeAiService implements AiService {
 }
 
 class _FakeChatRepository implements MessageRepository {
+  Object? saveMessageError;
+  Completer<void>? saveGate;
+
   @override
   Future<void> saveMessage({
     required String conversationId,
     required String sender,
     required String content,
-  }) async {}
+  }) async {
+    if (saveGate != null) await saveGate!.future;
+    if (saveMessageError != null) throw saveMessageError!;
+  }
+
   @override
   Future<List<ChatMessage>> fetchMessages(String conversationId) async => [];
   @override
@@ -87,11 +96,13 @@ class _Harness {
   _Harness()
     : themeController = ThemeController(),
       chatPreferencesController = ChatPreferencesController(),
-      authService = _FakeAuthService();
+      authService = _FakeAuthService(),
+      chatRepository = _FakeChatRepository();
 
   final ThemeController themeController;
   final ChatPreferencesController chatPreferencesController;
   final _FakeAuthService authService;
+  final _FakeChatRepository chatRepository;
 
   Widget build() {
     return MaterialApp(
@@ -100,7 +111,7 @@ class _Harness {
           services: {AiProvider.gemini: _FakeAiService()},
           initialProvider: AiProvider.gemini,
         ),
-        chatRepository: _FakeChatRepository(),
+        chatRepository: chatRepository,
         authService: authService,
         profileRepository: _FakeProfileRepository(),
         themeController: themeController,
@@ -112,6 +123,13 @@ class _Harness {
 }
 
 Future<void> _openMenu(WidgetTester tester) async {
+  // The menu now has enough items that it can overflow the default 600px
+  // test surface, pushing the lowest items (e.g. "Sign out") off-screen.
+  tester.view.physicalSize = const Size(800, 1600);
+  tester.view.devicePixelRatio = 1.0;
+  addTearDown(tester.view.resetPhysicalSize);
+  addTearDown(tester.view.resetDevicePixelRatio);
+
   await tester.tap(find.byKey(const Key('chatMenuButton')));
   await tester.pumpAndSettle();
 }
@@ -258,6 +276,114 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(harness.themeController.accentOverride, isNull);
+    });
+  });
+
+  group('text size picker', () {
+    testWidgets(
+      'selecting Large sets the text scale and is checked when reopened',
+      (tester) async {
+        final harness = _Harness();
+        await tester.pumpWidget(harness.build());
+        await tester.pumpAndSettle();
+        expect(harness.chatPreferencesController.textScale, 1.0);
+
+        await _openMenu(tester);
+        await tester.tap(find.byKey(const Key('textSizeMenuItem')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Large'));
+        await tester.pumpAndSettle();
+
+        expect(harness.chatPreferencesController.textScale, 1.15);
+
+        await _openMenu(tester);
+        await tester.tap(find.byKey(const Key('textSizeMenuItem')));
+        await tester.pumpAndSettle();
+
+        final largeTile = find.ancestor(
+          of: find.text('Large'),
+          matching: find.byType(ListTile),
+        );
+        expect(
+          find.descendant(of: largeTile, matching: find.byIcon(Icons.check)),
+          findsOneWidget,
+        );
+      },
+    );
+
+    testWidgets('scales the rendered message text', (tester) async {
+      final harness = _Harness();
+      await tester.pumpWidget(harness.build());
+      await tester.pumpAndSettle();
+
+      await tester.enterText(find.byKey(const Key('messageField')), 'Hello');
+      await tester.tap(find.byKey(const Key('sendButton')));
+      await tester.pumpAndSettle();
+
+      final beforeSize = tester.getSize(find.text('Hello'));
+
+      await _openMenu(tester);
+      await tester.tap(find.byKey(const Key('textSizeMenuItem')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Extra large'));
+      await tester.pumpAndSettle();
+
+      final afterSize = tester.getSize(find.text('Hello'));
+      expect(afterSize.height, greaterThan(beforeSize.height));
+    });
+  });
+
+  group('message status indicator', () {
+    testWidgets(
+      'shows sending, then sent, for a message that saves successfully',
+      (tester) async {
+        final harness = _Harness();
+        harness.chatRepository.saveGate = Completer<void>();
+        await tester.pumpWidget(harness.build());
+        await tester.pumpAndSettle();
+
+        await tester.enterText(find.byKey(const Key('messageField')), 'Hello');
+        await tester.tap(find.byKey(const Key('sendButton')));
+        await tester.pump();
+
+        expect(find.byKey(const Key('messageStatusSending')), findsOneWidget);
+
+        harness.chatRepository.saveGate!.complete();
+        await tester.pumpAndSettle();
+
+        expect(find.byKey(const Key('messageStatusSending')), findsNothing);
+        expect(find.byKey(const Key('messageStatusSent')), findsOneWidget);
+      },
+    );
+
+    testWidgets('shows a failed indicator when saving the message errors', (
+      tester,
+    ) async {
+      final harness = _Harness();
+      harness.chatRepository.saveMessageError = Exception('offline');
+      await tester.pumpWidget(harness.build());
+      await tester.pumpAndSettle();
+
+      await tester.enterText(find.byKey(const Key('messageField')), 'Hello');
+      await tester.tap(find.byKey(const Key('sendButton')));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('messageStatusFailed')), findsOneWidget);
+    });
+
+    testWidgets('AIDA\'s own messages never show a status indicator', (
+      tester,
+    ) async {
+      final harness = _Harness();
+      await tester.pumpWidget(harness.build());
+      await tester.pumpAndSettle();
+
+      await tester.enterText(find.byKey(const Key('messageField')), 'Hello');
+      await tester.tap(find.byKey(const Key('sendButton')));
+      await tester.pumpAndSettle();
+
+      // Exactly one status icon: the user's own message. AIDA's reply has none.
+      expect(find.byKey(const Key('messageStatusSent')), findsOneWidget);
     });
   });
 
