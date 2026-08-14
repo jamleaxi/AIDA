@@ -11,6 +11,7 @@ import '../services/profile_repository.dart';
 import '../services/theme_controller.dart';
 import 'auth_page.dart';
 import 'chat_page.dart';
+import 'offline_status_page.dart';
 import 'onboarding_page.dart';
 import 'reset_password_page.dart';
 import 'splash_screen.dart';
@@ -126,12 +127,20 @@ class _ProfileGateState extends State<_ProfileGate> {
   @override
   void initState() {
     super.initState();
+    _loadProfile();
+  }
+
+  void _loadProfile() {
     _profileFuture = widget.profileRepository.fetchProfile(widget.userId).then((
       profile,
     ) {
       if (profile != null) widget.themeController.setGender(profile.gender);
       return profile;
     });
+  }
+
+  void _retryLoadProfile() {
+    setState(_loadProfile);
   }
 
   void _onOnboardingComplete(UserProfile profile) {
@@ -148,6 +157,13 @@ class _ProfileGateState extends State<_ProfileGate> {
       builder: (context, snapshot) {
         if (snapshot.connectionState != ConnectionState.done) {
           return const Scaffold(body: SplashBody());
+        }
+
+        // Most commonly a failed profile lookup means the device is offline.
+        // Show that instead of misreading it as "no profile yet" and sending
+        // the user into onboarding to re-enter their name and gender.
+        if (snapshot.hasError) {
+          return OfflineStatusPage(onRetry: _retryLoadProfile);
         }
 
         final profile = snapshot.data;
