@@ -25,10 +25,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.enterText(
-      find.byKey(const Key('messageField')),
-      'Hello',
-    );
+    await tester.enterText(find.byKey(const Key('messageField')), 'Hello');
     await tester.tap(find.byKey(const Key('sendButton')));
     await tester.pumpAndSettle();
 
@@ -52,10 +49,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.enterText(
-      find.byKey(const Key('messageField')),
-      'Hello',
-    );
+    await tester.enterText(find.byKey(const Key('messageField')), 'Hello');
     await tester.tap(find.byKey(const Key('sendButton')));
     await tester.pumpAndSettle();
 
@@ -120,10 +114,28 @@ class _FakeAuthService implements AuthService {
   Stream<AppUser?> get userChanges => Stream.value(_user);
 
   @override
-  Future<void> signIn({required String email, required String password}) async {}
+  Stream<void> get passwordRecoveryRequested => const Stream.empty();
 
   @override
-  Future<void> signUp({required String email, required String password}) async {}
+  Future<void> signIn({
+    required String email,
+    required String password,
+  }) async {}
+
+  @override
+  Future<void> signUp({
+    required String email,
+    required String password,
+  }) async {}
+
+  @override
+  Future<void> signInWithGoogle() async {}
+
+  @override
+  Future<void> resetPassword({required String email}) async {}
+
+  @override
+  Future<void> updatePassword({required String newPassword}) async {}
 
   @override
   Future<void> signOut() async {}
@@ -131,11 +143,8 @@ class _FakeAuthService implements AuthService {
 
 class _FakeProfileRepository implements ProfileRepository {
   @override
-  Future<UserProfile?> fetchProfile(String userId) async => UserProfile(
-        id: userId,
-        displayName: 'Test User',
-        gender: Gender.male,
-      );
+  Future<UserProfile?> fetchProfile(String userId) async =>
+      UserProfile(id: userId, displayName: 'Test User', gender: Gender.male);
 
   @override
   Future<void> saveProfile({

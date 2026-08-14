@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../models/user_profile.dart';
@@ -10,9 +12,10 @@ import '../services/theme_controller.dart';
 import 'auth_page.dart';
 import 'chat_page.dart';
 import 'onboarding_page.dart';
+import 'reset_password_page.dart';
 import 'splash_screen.dart';
 
-class AuthGate extends StatelessWidget {
+class AuthGate extends StatefulWidget {
   const AuthGate({
     super.key,
     required this.authService,
@@ -31,25 +34,62 @@ class AuthGate extends StatelessWidget {
   final ChatPreferencesController chatPreferencesController;
 
   @override
+  State<AuthGate> createState() => _AuthGateState();
+}
+
+class _AuthGateState extends State<AuthGate> {
+  bool _passwordRecoveryPending = false;
+  StreamSubscription<void>? _recoverySubscription;
+
+  @override
+  void initState() {
+    super.initState();
+    _recoverySubscription = widget.authService.passwordRecoveryRequested.listen(
+      (_) {
+        if (mounted) setState(() => _passwordRecoveryPending = true);
+      },
+    );
+  }
+
+  @override
+  void dispose() {
+    _recoverySubscription?.cancel();
+    super.dispose();
+  }
+
+  void _completePasswordRecovery() {
+    setState(() => _passwordRecoveryPending = false);
+  }
+
+  @override
   Widget build(BuildContext context) {
+    // A password-reset link signs the user into a real session, but they
+    // must set a new password before going any further into the app.
+    if (_passwordRecoveryPending) {
+      return ResetPasswordPage(
+        authService: widget.authService,
+        onComplete: _completePasswordRecovery,
+      );
+    }
+
     return StreamBuilder<AppUser?>(
-      stream: authService.userChanges,
-      initialData: authService.currentUser,
+      stream: widget.authService.userChanges,
+      initialData: widget.authService.currentUser,
       builder: (context, snapshot) {
         final user = snapshot.data;
         if (user == null) {
-          return AuthPage(authService: authService);
+          return AuthPage(authService: widget.authService);
         }
 
         return _ProfileGate(
           key: ValueKey(user.id),
           userId: user.id,
-          profileRepository: profileRepository,
-          aiProviderController: aiProviderController,
-          chatRepository: chatRepository,
-          authService: authService,
-          themeController: themeController,
-          chatPreferencesController: chatPreferencesController,
+          profileRepository: widget.profileRepository,
+          aiProviderController: widget.aiProviderController,
+          chatRepository: widget.chatRepository,
+          authService: widget.authService,
+          themeController: widget.themeController,
+          chatPreferencesController: widget.chatPreferencesController,
         );
       },
     );

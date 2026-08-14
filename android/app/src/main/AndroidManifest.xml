@@ -25,6 +25,17 @@
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
+            <!-- Brings the app back to the foreground after a Supabase OAuth
+                 (Google sign-in) or password-reset email flow completes in
+                 the browser. Must match the redirectTo used in
+                 SupabaseAuthService and the Redirect URL allow-listed in the
+                 Supabase Dashboard. -->
+            <intent-filter android:autoVerify="false">
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="io.supabase.aida" android:host="login-callback"/>
+            </intent-filter>
         </activity>
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->

@@ -24,6 +24,21 @@
 	<string>????</string>
 	<key>CFBundleVersion</key>
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
+	<!-- Brings the app back to the foreground after a Supabase OAuth (Google
+	     sign-in) or password-reset email flow completes in the browser. Must
+	     match the redirectTo used in SupabaseAuthService and the Redirect URL
+	     allow-listed in the Supabase Dashboard. -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>io.supabase.aida</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>io.supabase.aida</string>
+			</array>
+		</dict>
+	</array>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>UIApplicationSceneManifest</key>
