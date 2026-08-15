@@ -7,6 +7,7 @@ import '../services/ai_provider_controller.dart';
 import '../services/auth_service.dart';
 import '../services/chat_preferences_controller.dart';
 import '../services/chat_repository.dart';
+import '../services/connectivity_service.dart';
 import '../services/profile_repository.dart';
 import '../services/theme_controller.dart';
 import 'auth_page.dart';
@@ -17,7 +18,7 @@ import 'reset_password_page.dart';
 import 'splash_screen.dart';
 
 class AuthGate extends StatefulWidget {
-  const AuthGate({
+  AuthGate({
     super.key,
     required this.authService,
     required this.aiProviderController,
@@ -25,7 +26,8 @@ class AuthGate extends StatefulWidget {
     required this.profileRepository,
     required this.themeController,
     required this.chatPreferencesController,
-  });
+    ConnectivityService? connectivityService,
+  }) : connectivityService = connectivityService ?? ConnectivityService();
 
   final AuthService authService;
   final AiProviderController aiProviderController;
@@ -33,6 +35,7 @@ class AuthGate extends StatefulWidget {
   final ProfileRepository profileRepository;
   final ThemeController themeController;
   final ChatPreferencesController chatPreferencesController;
+  final ConnectivityService connectivityService;
 
   @override
   State<AuthGate> createState() => _AuthGateState();
@@ -79,7 +82,10 @@ class _AuthGateState extends State<AuthGate> {
       builder: (context, snapshot) {
         final user = snapshot.data;
         if (user == null) {
-          return AuthPage(authService: widget.authService);
+          return _LoggedOutGate(
+            authService: widget.authService,
+            connectivityService: widget.connectivityService,
+          );
         }
 
         return _ProfileGate(
@@ -94,6 +100,62 @@ class _AuthGateState extends State<AuthGate> {
         );
       },
     );
+  }
+}
+
+/// Gates the login/signup screen behind a real connectivity check: a
+/// logged-out user only ever sees [AuthPage] while the device has a network
+/// path, otherwise [OfflineStatusPage] is shown and the connection is
+/// re-checked automatically as connectivity changes.
+class _LoggedOutGate extends StatefulWidget {
+  const _LoggedOutGate({
+    required this.authService,
+    required this.connectivityService,
+  });
+
+  final AuthService authService;
+  final ConnectivityService connectivityService;
+
+  @override
+  State<_LoggedOutGate> createState() => _LoggedOutGateState();
+}
+
+class _LoggedOutGateState extends State<_LoggedOutGate> {
+  bool? _hasConnection;
+  StreamSubscription<bool>? _connectivitySubscription;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkConnection();
+    _connectivitySubscription = widget.connectivityService.onConnectivityChanged
+        .listen((hasConnection) {
+          if (mounted) setState(() => _hasConnection = hasConnection);
+        });
+  }
+
+  @override
+  void dispose() {
+    _connectivitySubscription?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _checkConnection() async {
+    final hasConnection = await widget.connectivityService.hasConnection();
+    if (mounted) setState(() => _hasConnection = hasConnection);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_hasConnection == null) {
+      return const Scaffold(body: SplashBody());
+    }
+
+    if (!_hasConnection!) {
+      return OfflineStatusPage(onRetry: _checkConnection);
+    }
+
+    return AuthPage(authService: widget.authService);
   }
 }
 

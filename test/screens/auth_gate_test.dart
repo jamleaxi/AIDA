@@ -12,6 +12,7 @@ import 'package:aida/services/ai_service.dart';
 import 'package:aida/services/auth_service.dart';
 import 'package:aida/services/chat_preferences_controller.dart';
 import 'package:aida/services/chat_repository.dart';
+import 'package:aida/services/connectivity_service.dart';
 import 'package:aida/services/profile_repository.dart';
 import 'package:aida/services/theme_controller.dart';
 import 'package:flutter/material.dart';
@@ -103,9 +104,28 @@ class _FakeAiService implements AiService {
   void close() {}
 }
 
+class _FakeConnectivityService extends ConnectivityService {
+  _FakeConnectivityService({this.connected = true});
+
+  bool connected;
+  final _controller = StreamController<bool>.broadcast();
+
+  @override
+  Future<bool> hasConnection() async => connected;
+
+  @override
+  Stream<bool> get onConnectivityChanged => _controller.stream;
+
+  void emit(bool value) {
+    connected = value;
+    _controller.add(value);
+  }
+}
+
 Widget _buildAuthGate({
   required _FakeAuthService authService,
   required _FakeProfileRepository profileRepository,
+  ConnectivityService? connectivityService,
 }) {
   return MaterialApp(
     home: AuthGate(
@@ -118,6 +138,7 @@ Widget _buildAuthGate({
       profileRepository: profileRepository,
       themeController: ThemeController(),
       chatPreferencesController: ChatPreferencesController(),
+      connectivityService: connectivityService ?? _FakeConnectivityService(),
     ),
   );
 }
@@ -141,6 +162,33 @@ void main() {
 
     expect(find.text('Sign in to continue'), findsOneWidget);
   });
+
+  testWidgets(
+    'shows OfflineStatusPage instead of AuthPage when signed out with no connection',
+    (tester) async {
+      final authService = _FakeAuthService();
+      final profileRepository = _FakeProfileRepository();
+      final connectivityService = _FakeConnectivityService(connected: false);
+
+      await tester.pumpWidget(
+        _buildAuthGate(
+          authService: authService,
+          profileRepository: profileRepository,
+          connectivityService: connectivityService,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byType(OfflineStatusPage), findsOneWidget);
+      expect(find.text('Sign in to continue'), findsNothing);
+
+      connectivityService.emit(true);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Sign in to continue'), findsOneWidget);
+      expect(find.byType(OfflineStatusPage), findsNothing);
+    },
+  );
 
   testWidgets('shows OfflineStatusPage when the profile lookup fails', (
     tester,
